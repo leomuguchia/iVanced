@@ -1,5 +1,5 @@
-#!/usr/bin/env sh
-# {
+#!/bin/sh
+
 
 # $(rm *.log 2> /dev/null)
 set -e

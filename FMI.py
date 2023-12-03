@@ -501,7 +501,7 @@ if __name__ == "__main__":
          continue_button.click()
 
      # Prompt user to choose between auto and manual entry
-     print("*Hint: Auto fetches the device details based on device IMEI/SN")
+     print("*Hint: Auto fetches the device details based on device IMEI/SN ")
      user_choice = input("Choose 'auto' or 'manual' entry (default: auto): ").lower()
 
      # Set default choice to "auto" if the user doesn't provide any input
@@ -528,3 +528,6 @@ if __name__ == "__main__":
     background_thread = threading.Thread(target=background_instance, args=(bg_sleep,))
     background_thread.start()
     background_thread.join()
+
+        
+        
