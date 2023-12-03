@@ -41,16 +41,15 @@ if [ -e sshtars/ssh.tar.gz ]; then
     fi
 fi
 
-if [ ! -e "$oscheck"/gaster ]; then
+if [ ! -e "./ramdisk/Linux/gaster" ]; then
     curl -sLO https://nightly.link/verygenericname/gaster/workflows/makefile/main/gaster-"$oscheck".zip
     unzip gaster-"$oscheck".zip
-    mkdir -p "$oscheck"/Linux   # Create 'Linux/' directory if it doesn't exist
-    mv gaster "$oscheck"/Linux/
+    mv gaster ramdisk/Linux/
     rm -rf gaster gaster-"$oscheck".zip
 fi
 
 
-chmod +x "$oscheck"/*
+chmod -R +x ./ramdisk/$oscheck/*
 
 if [ "$1" = 'clean' ]; then
     rm -rf sshramdisk work
@@ -71,8 +70,8 @@ elif [ "$1" = 'dump-blobs' ]; then
     echo "[*] Onboard blobs should have dumped to the dumped.shsh file"
     exit
 elif [ "$1" = 'reboot' ]; then
-    "./$oscheck"/iproxy 2222 22 &>/dev/null &
-    "./$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost "/sbin/reboot"
+    "$oscheck"/iproxy 2222 22 &>/dev/null &
+    "$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost "/sbin/reboot"
     echo "[*] Device should now reboot"
     exit
 elif [ "$1" = 'ssh' ]; then

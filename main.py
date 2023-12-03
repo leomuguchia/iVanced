@@ -7,8 +7,13 @@ from tkinter import messagebox
 from tkinter.simpledialog import askstring
 import signal
 from tkinter import filedialog
-
-
+import requests
+from bs4 import BeautifulSoup
+from colorama import Fore, Style
+import tkinter as tk
+from tkinter import ttk
+from tkinter import Tk, StringVar, OptionMenu, Label, Entry, Button, CENTER
+import json
 
 class GuiApp:
     def __init__(self, master):
@@ -26,6 +31,10 @@ class GuiApp:
         self.create_header()
         self.create_widgets()
         
+        self.is_user_input_required = False
+
+    def set_user_input_required(self, value):
+        self.is_user_input_required = value
 
     def create_widgets(self):
         lcw = self.master.winfo_screenwidth() * 0.2
@@ -60,11 +69,13 @@ class GuiApp:
         container1.pack(side="left", fill=tk.BOTH, expand=False)
 
         buttons_info = [
-            ("Jailbreak iOS", self.jail_break),
             ("iOS Activation", self.show_activation_popup),
-            ("Advanced Flash", self.smart_flash),
             ("Ramdisk (iOS 14-16)", self.ramdisk),
+            ("Jailbreak iOS", self.jail_break),
+            ("Advanced Flash", self.smart_flash),
             ("Exit Recovery Mode", self.exit_recovery_mode),
+            ("My Device (All phones!)", self.check_imei),
+            ("FMI Unlock (All iphones!)", self.fmi_unlock),
         ]
 
         for text, command in buttons_info:
@@ -87,59 +98,64 @@ class GuiApp:
 
 
     def run_terminal_command(self, command_function, *command_args, callback=None):
-        try:
-            # Use preexec_fn=os.setsid to create a new process group
-            process = subprocess.Popen(
-                command_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True, preexec_fn=os.setsid
-            )
+     try:
+         process = subprocess.Popen(
+             command_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True, preexec_fn=os.setsid
+         )
+ 
+         def update_terminal():
+             nonlocal process
+             try:
+                 line = process.stdout.readline()
+                 if line:
+                     # Check for subprocess request for user input
+                     if self.is_user_input_required:
+                         print(f"Subprocess requires user input: {line}")
+                     else:
+                         self.terminal.print_to_terminal(line, tag="output")
+                         self.master.update_idletasks()  # Update the Tkinter GUI
+ 
+                     self.master.after(10, update_terminal)  # Schedule the next update
+                 elif process.poll() is not None:
+                     # Command has finished
+                     remaining_output = process.communicate()[0]
+                     if remaining_output:
+                         self.terminal.print_to_terminal(remaining_output, tag="output")
+                         self.master.update_idletasks()  # Update the Tkinter GUI
+ 
+                     if callback:
+                         # Schedule the callback to be executed after a short delay
+                         self.master.after(100, callback)
+             except Exception as e:
+                 # Handle exceptions during update
+                 print(f"Error during terminal update: {e}")
+ 
+         # Start the initial update
+         update_terminal()
+ 
+     except subprocess.CalledProcessError as e:
+         error_message = f"Error: {e.stderr}"
+         self.terminal.print_to_terminal(error_message, tag="error")
+ 
+         # Ensure that the input prompt is called in case of an error
+         self.terminal.input_prompt()
+ 
+     except Exception as e:
+         error_message = f"An unexpected error occurred: {e}"
+         self.terminal.print_to_terminal(error_message, tag="error")
+ 
+         # Ensure that the input prompt is called in case of an unexpected error
+         self.terminal.input_prompt()
+ 
+     def handle_interrupt(signum, frame):
+         # Handle keyboard interrupt (Ctrl+C)
+         self.terminal.print_to_terminal("Command interrupted.")
+         process.terminate()
+         os.killpg(process.pid, signal.SIGTERM)  # Send signal to the whole process group
+         process.wait()
 
-            def update_terminal():
-                nonlocal process
-                try:
-                    line = process.stdout.readline()
-                    if line:
-                        self.terminal.print_to_terminal(line, tag="output")
-                        self.master.update_idletasks()  # Update the Tkinter GUI
-                        self.master.after(10, update_terminal)  # Schedule the next update
-                    elif process.poll() is not None:
-                        # Command has finished
-                        remaining_output = process.communicate()[0]
-                        if remaining_output:
-                            self.terminal.print_to_terminal(remaining_output, tag="output")
-                            self.master.update_idletasks()  # Update the Tkinter GUI
-                        if callback:
-                            # Schedule the callback to be executed after a short delay
-                            self.master.after(100, callback)
-                except Exception as e:
-                    # Handle exceptions during update
-                    print(f"Error during terminal update: {e}")
-
-            # Start the initial update
-            update_terminal()
-
-        except subprocess.CalledProcessError as e:
-            error_message = f"Error: {e.stderr}"
-            self.terminal.print_to_terminal(error_message, tag="error")
-
-            # Ensure that the input prompt is called in case of an error
-            self.terminal.input_prompt()
-
-        except Exception as e:
-            error_message = f"An unexpected error occurred: {e}"
-            self.terminal.print_to_terminal(error_message, tag="error")
-
-            # Ensure that the input prompt is called in case of an unexpected error
-            self.terminal.input_prompt()
-
-        def handle_interrupt(signum, frame):
-            # Handle keyboard interrupt (Ctrl+C)
-            print("Command interrupted.")
-            process.terminate()
-            os.killpg(process.pid, signal.SIGTERM)  # Send signal to the whole process group
-            process.wait()
-
-        # Register the signal handler for Ctrl+C
-        signal.signal(signal.SIGINT, handle_interrupt)
+     # Register the signal handler for Ctrl+C
+     signal.signal(signal.SIGINT, handle_interrupt)
 
 
     def jail_break(self):
@@ -166,6 +182,73 @@ class GuiApp:
      # Define the necessary command arguments here
      command_args = ["sudo", "./checkra1n", "-c", "-V", "-E"]
      self.run_terminal_command(command_args, callback=self.terminal.input_prompt)
+
+    def fmi_unlock(self):
+     try:
+         # Call the checkbox script
+         self.terminal.print_to_terminal("web instanced opened in main terminal")
+         self.terminal.print_to_terminal("happy hacking!@^_^@")
+         command_args = ["python3", "FMI.py"]
+         subprocess.run(command_args, check=True)
+
+     except Exception as e:
+         print(f"Error during FMI Unlock: {e}")
+     self.terminal.input_prompt()   
+        
+    def check_imei(self):
+        # Initialize Tkinter top-level window
+        self.top_level = Tk()
+        self.top_level.title("IMEI Check")
+
+        # Set the size and position of the top-level window
+        window_width = 400
+        window_height = 250
+        screen_width = self.top_level.winfo_screenwidth()
+        screen_height = self.top_level.winfo_screenheight()
+        x_position = (screen_width - window_width) // 2
+        y_position = (screen_height - window_height) // 2
+        self.top_level.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+
+        # Create labels, input field, submit button
+        Label(self.top_level, text="Enter IMEI:", pady=5).pack(pady=10)
+        self.imei_var = StringVar(self.top_level)
+        imei_entry = Entry(self.top_level, bd=3, relief="groove", width=20, textvariable=self.imei_var)
+        imei_entry.pack(pady=5)
+
+        submit_button = Button(self.top_level, text="Submit", command=self.submit)
+        submit_button.pack(pady=10)
+
+    def is_valid_imei(self, imei):
+        # Implement your IMEI validation logic here
+        return len(imei) == 15 and imei.isdigit()
+
+    def submit(self):
+        entered_imei = self.imei_var.get()
+
+        # Validate IMEI
+        if not self.is_valid_imei(entered_imei):
+            self.terminal.print_to_terminal("Invalid IMEI number", tag="error")
+            return
+
+        # Call the method to check IMEI and display the result
+        self.process_imei(entered_imei)
+        # Close the top-level window after processing the IMEI
+        self.top_level.destroy()
+    
+    def process_imei(self, imei):
+        api_url = "https://sickw.com/api.php"
+        api_key = "0D7-TL4-TE3-M5L-GRU-KJ7-409-FFQ"  # Replace with your Sickw.com API key
+        service_id = "30"  # You can choose the appropriate service ID based on your requirements
+
+        curl_command = f'curl "{api_url}?format=json&key={api_key}&imei={imei}&service={service_id}"'
+
+        try:
+            result = subprocess.check_output(curl_command, shell=True, text=True)
+            self.terminal.print_to_terminal(f"IMEI Details for {imei}:\n{result}", tag="output")
+            self.terminal.input_prompt()
+        except subprocess.CalledProcessError as e:
+            self.terminal.print_to_terminal(f"Error: {e}", tag="error")
+            self.terminal.input_prompt()
 
 
     def start_palera1n(self):
@@ -261,14 +344,10 @@ class GuiApp:
      command_args_boot = ["bash", "./ramdisk/sshrd.sh", "boot"]
 
      # Execute subprocess commands
-     self.terminal.print_to_terminal("\nCleaning RAM Disk...\n")
-     self.run_terminal_command(*command_args_clean, callback=self.terminal.input_prompt)
-
-     self.terminal.print_to_terminal("Loading iOS Version onto RAM Disk...\n")
-     self.run_terminal_command(*command_args_load, callback=self.terminal.input_prompt)
-
-     self.terminal.print_to_terminal("Booting RAM Disk...\n")
-     self.run_terminal_command(*command_args_boot, callback=self.terminal.input_prompt)
+     self.terminal.print_to_terminal("----ramdisk----\n")
+     self.run_terminal_command(*command_args_clean,callback=self.terminal.input_prompt)
+     self.run_terminal_command(*command_args_load,callback=self.terminal.input_prompt)
+     self.run_terminal_command(*command_args_boot,callback=self.terminal.input_prompt)
 
     
     def show_activation_popup(self):
@@ -396,9 +475,10 @@ class GuiApp:
     #iRecovery tool commands
     def exit_recovery_mode(self):
      command_function = self.exit_recovery_mode
-     command_args = ["./device/irecovery", "-reboot"]
-     self.run_terminal_command(command_function, command_args)
-
+     command_args = ["./device/irecovery", "-s"]
+     self.run_terminal_command(command_function, *command_args)
+     
+     
     def upload_file(self, file_path):
      command_function = self.upload_file
      file_path = filedialog.askopenfilename(title="Select a file")
@@ -495,9 +575,9 @@ class GuiApp:
             "**********Quick Flash*********\n\n"
             "Step 1: Connect your iPhone",
             "Step 2: Enter recovery mode then DFU ",
-            "Step 3: Press jailbreak iOS",
-            "Step 4: When the device is jailbroken, click 'iOS Activation'",
-            "Step 5: Save the activation files",
+            
+            "set up more instructions here....",
+            "set up more instructions here....",
             "set up more instructions here...."
         ]
 
@@ -535,22 +615,26 @@ class CustomTerminal:
         self.input_prompt()
 
     def setup_text_widget(self):
-     visible_lines = 20  # Adjust this based on your preference
-     extra_lines_at_bottom = 5  # Adjust this based on how many extra lines you want at the bottom
+        visible_lines = 20  # Adjust this based on your preference
+        extra_lines_at_bottom = 5  # Adjust this based on how many extra lines you want at the bottom
+        total_height = visible_lines + extra_lines_at_bottom
 
-     total_height = visible_lines + extra_lines_at_bottom
- 
-     self.text_widget = tk.Text(
-         self.master,
-         wrap=tk.WORD,
-         font=("Courier", 12),
-         bg="black",
-         fg="white",
-         width=55,
-         height=total_height,  # Set the total height
-         highlightthickness=0  # Set highlightthickness to 0 to remove the border
-     )
-     self.text_widget.pack(expand=True, fill="both", pady=(0, 20))
+        self.text_widget = tk.Text(
+            self.master,
+            wrap=tk.WORD,
+            font=("Courier", 12),
+            bg="black",
+            fg="white",
+            width=55,
+            height=total_height,  # Set the total height
+            highlightthickness=0,  # Set highlightthickness to 0 to remove the border
+        )
+        self.text_widget.pack(expand=True, fill="both", pady=(0, 20))
+
+    def print_colored(self, text, color="white"):
+        colored_text = f"\033[{color}m{text}\033[0m"
+        self.text_widget.insert(tk.END, colored_text)
+
 
     
 
@@ -697,21 +781,29 @@ class CustomTerminal:
 
 
     def ls_command(self, args):
-     if args:
-         folder = args[0]
-     else:
-         folder = self.current_folder
+        folder = args[0] if args else self.current_folder
 
-     try:
-         # List files and directories in the specified or current folder
-         contents = os.listdir(folder)
+        try:
+            contents = sorted(os.listdir(folder))
+            max_line_width = 80
 
-         # Print or display the list of files and directories
-         for item in contents:
-             self.print_to_terminal(item, tag="output")
+            colored_items = []
 
-     except FileNotFoundError:
-         self.print_to_terminal(f"Directory not found: {folder}", tag="output")
+            for item in contents:
+                full_path = os.path.join(folder, item)
+                if os.path.isdir(full_path):
+                    colored_items.append(f"\033[1;34m{item}\033[0m  ")  # Blue color for directories
+                else:
+                    colored_items.append(f"{item}  ")
+
+            formatted_items = "".join(colored_items)
+            lines = [formatted_items[i:i + max_line_width] for i in range(0, len(formatted_items), max_line_width)]
+
+            for line in lines:
+                self.print_to_terminal(line.rstrip())
+
+        except FileNotFoundError:
+            self.print_to_terminal(f"Directory not found: {folder}", tag="output")
         
         
     def print_to_terminal(self, command_name, message="", tag="output"):
