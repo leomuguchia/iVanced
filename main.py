@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import Tk, StringVar, OptionMenu, Label, Entry, Button, CENTER
 import json
+import re
 
 class GuiApp:
     def __init__(self, master):
@@ -110,9 +111,10 @@ class GuiApp:
                  if line:
                      # Check for subprocess request for user input
                      if self.is_user_input_required:
-                         print(f"Subprocess requires user input: {line}")
+                         print(f"Subprocess requires user input: \n{line}")
                      else:
-                         self.terminal.print_to_terminal(line, tag="output")
+                         self.terminal.print_to_terminal(f"\n{line}", tag="output")
+                         print(line)
                          self.master.update_idletasks()  # Update the Tkinter GUI
  
                      self.master.after(10, update_terminal)  # Schedule the next update
@@ -120,7 +122,7 @@ class GuiApp:
                      # Command has finished
                      remaining_output = process.communicate()[0]
                      if remaining_output:
-                         self.terminal.print_to_terminal(remaining_output, tag="output")
+                         self.terminal.print_to_terminal(f"\n{remaining_output}", tag="output")
                          self.master.update_idletasks()  # Update the Tkinter GUI
  
                      if callback:
@@ -134,14 +136,14 @@ class GuiApp:
          update_terminal()
  
      except subprocess.CalledProcessError as e:
-         error_message = f"Error: {e.stderr}"
+         error_message = f"Error:\n {e.stderr}"
          self.terminal.print_to_terminal(error_message, tag="error")
  
          # Ensure that the input prompt is called in case of an error
          self.terminal.input_prompt()
  
      except Exception as e:
-         error_message = f"An unexpected error occurred: {e}"
+         error_message = f"An unexpected error occurred:\n {e}"
          self.terminal.print_to_terminal(error_message, tag="error")
  
          # Ensure that the input prompt is called in case of an unexpected error
@@ -153,6 +155,7 @@ class GuiApp:
          process.terminate()
          os.killpg(process.pid, signal.SIGTERM)  # Send signal to the whole process group
          process.wait()
+         self.terminal.input_prompt()
 
      # Register the signal handler for Ctrl+C
      signal.signal(signal.SIGINT, handle_interrupt)
@@ -190,6 +193,7 @@ class GuiApp:
          self.terminal.print_to_terminal("happy hacking!@^_^@")
          command_args = ["python3", "FMI.py"]
          subprocess.run(command_args, check=True)
+         self.terminal.input_prompt()  
 
      except Exception as e:
          print(f"Error during FMI Unlock: {e}")
@@ -208,6 +212,9 @@ class GuiApp:
         x_position = (screen_width - window_width) // 2
         y_position = (screen_height - window_height) // 2
         self.top_level.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+        
+        # Bind the window close event to a function
+        self.top_level.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # Create labels, input field, submit button
         Label(self.top_level, text="Enter IMEI:", pady=5).pack(pady=10)
@@ -215,8 +222,18 @@ class GuiApp:
         imei_entry = Entry(self.top_level, bd=3, relief="groove", width=20, textvariable=self.imei_var)
         imei_entry.pack(pady=5)
 
+        Label(self.top_level, text="Enter API Key:", pady=5).pack(pady=10)
+        self.api_var = StringVar(self.top_level)
+        api_entry = Entry(self.top_level, bd=3, relief="groove", width=20, textvariable=self.api_var)
+        api_entry.pack(pady=5)
+
         submit_button = Button(self.top_level, text="Submit", command=self.submit)
         submit_button.pack(pady=10)
+        
+    def on_close(self):
+     # Function to be called when the window is closed
+     self.terminal.input_prompt()
+     self.top_level.destroy()    
 
     def is_valid_imei(self, imei):
         # Implement your IMEI validation logic here
@@ -224,6 +241,7 @@ class GuiApp:
 
     def submit(self):
         entered_imei = self.imei_var.get()
+        entered_api = self.api_var.get()
 
         # Validate IMEI
         if not self.is_valid_imei(entered_imei):
@@ -231,26 +249,45 @@ class GuiApp:
             return
 
         # Call the method to check IMEI and display the result
-        self.process_imei(entered_imei)
+        self.process_imei(entered_imei, entered_api)
         # Close the top-level window after processing the IMEI
         self.top_level.destroy()
+        self.terminal.input_prompt()
     
-    def process_imei(self, imei):
-        api_url = "https://sickw.com/api.php"
-        api_key = "0D7-TL4-TE3-M5L-GRU-KJ7-409-FFQ"  # Replace with your Sickw.com API key
-        service_id = "30"  # You can choose the appropriate service ID based on your requirements
-
-        curl_command = f'curl "{api_url}?format=json&key={api_key}&imei={imei}&service={service_id}"'
-
-        try:
-            result = subprocess.check_output(curl_command, shell=True, text=True)
-            self.terminal.print_to_terminal(f"IMEI Details for {imei}:\n{result}", tag="output")
-            self.terminal.input_prompt()
-        except subprocess.CalledProcessError as e:
-            self.terminal.print_to_terminal(f"Error: {e}", tag="error")
-            self.terminal.input_prompt()
-
-
+    def process_imei(self, imei, api):
+     api_url = "https://sickw.com/api.php"
+     service_id = "30"
+ 
+     curl_command = f'curl "{api_url}?format=json&key={api}&imei={imei}&service={service_id}"'
+ 
+     try:
+         result = subprocess.check_output(curl_command, shell=True, text=True)
+         json_result = json.loads(result)
+ 
+         if json_result["status"] == "success":
+             imei_details = json_result["result"]
+ 
+             # Extract relevant information from the string
+             formatted_output = f"IMEI Details for {imei}:\n"
+             details_pattern = re.compile(r'<br>(.*?)<br>', re.DOTALL)
+             details_matches = details_pattern.findall(imei_details)
+ 
+             for detail in details_matches:
+                 # Remove <font> tags and print each detail in its own line
+                 clean_detail = re.sub(r'<font color="red">|</font>', '', detail).strip()
+                 formatted_output += clean_detail + "\n"
+ 
+             self.terminal.print_to_terminal(formatted_output, tag="output")
+         else:
+             self.terminal.print_to_terminal(f"Error: {json_result['status']}", tag="error")
+         
+         self.terminal.input_prompt()
+ 
+     except subprocess.CalledProcessError as e:
+         self.terminal.print_to_terminal(f"Error: {e}", tag="error")
+         self.terminal.input_prompt()
+ 
+ 
     def start_palera1n(self):
      # Display the initial message in the custom terminal
      initial_message = "Choose an option: ['build', 'boot']\n"
@@ -473,53 +510,90 @@ class GuiApp:
    
         
     #iRecovery tool commands
-    def exit_recovery_mode(self):
+    def exit_recovery_mode(self, args=None):
      command_function = self.exit_recovery_mode
      command_args = ["./device/irecovery", "-s"]
      self.run_terminal_command(command_function, *command_args)
-     
-     
+         
     def upload_file(self, file_path):
      command_function = self.upload_file
      file_path = filedialog.askopenfilename(title="Select a file")
      command_args = ["./device/irecovery", "-f", file_path]
-     self.run_terminal_command(command_function, command_args)
+     self.run_terminal_command(command_function, *command_args)
 
-    def two_way_shell(self):
+    def two_way_shell(self, args=None):
      command_function = self.two_way_shell
      command_args = ["./device/irecovery", "-s"]
-     self.run_terminal_command(command_function, command_args)
+     self.run_terminal_command(command_function, *command_args)
 
     def single_command(self, custom_command):
      command_function = self.single_command
      command_args = ["./device/irecovery", "-c", custom_command]
-     self.run_terminal_command(command_function, command_args)
+     self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
-    def exploit_command(self):
+    def exploit_command(self, args=None):
      command_function = self.exploit_command
-     command_args = ["./device/irecovery", "-k"]
-     self.run_terminal_command(command_function, command_args)
+     command_args = ["./device/irecovery", "-e"]
+     self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
-    def enable_auto_boot(self):
-     command_function = self.enable_auto_boot
+    def apple_support(self, args=None):
+     command_function = self.apple_support
      command_args = ["./device/irecovery", "-a"]
-     self.run_terminal_command(command_function, command_args)
-
-    def usb_reset(self):
+     self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
+ 
+    def usb_reset(self, args=None):
      command_function = self.usb_reset
      command_args = ["./device/irecovery", "-r"]
-     self.run_terminal_command(command_function, command_args)
+     self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
     def batch_scripting(self, script_file):
      command_function = self.batch_scripting
      command_args = ["./device/irecovery", "-b", script_file]
-     self.run_terminal_command(command_function, command_args)
-
+     self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
+ 
     def raw_commands(self, raw_command):
      command_function = self.raw_commands
      command_args = ["./device/irecovery", "-x21", "-x40", "-xA1", raw_command]
-     self.run_terminal_command(command_function, command_args)
-   
+     self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
+  
+    def irecovery_help(self, args=None):
+     help_message = """
+     \nHelp for recovery commands:
+     ufile - You can upload a file to 0x9000000
+     2wayshell - You can spawn a shell to do all sorts of neat things Once it has spawned, you can type 'help' and iBoot will respond with its built-in command list
+     sincomm - Sends a single command to the device *without* spawning a shell.
+     excomm - Sends Chronic Dev's + Geohot's latest usb exploit.
+     applesupport - Get all apples devices manufacturer's details
+     usbres - Reset USB
+     batscript - this allows you to send commands to iBoot from a pre written list of commands, this also supports scripting such as /auto-boot and /upload <file>
+     rawcomm - You can now send raw commands via the -x21 -x40 or -xA1 flags. type rawhelp to view supported raw commands
+     rchelp - see a list of available recovery commands and their functionality
+     rawhelp - see a list of available raw recoverycommands
+     """
+     self.terminal.print_to_terminal(help_message)
+     self.terminal.input_prompt()
+     
+    def irecovery_raw(self, args=None):
+     help_message = """
+     ufile - You can upload a file to 0x9000000
+     2wayshell - You can spawn a shell to do all sorts of neat things Once it has spawned, you can type 'help' and iBoot will respond with its built-in command list
+     sincomm - Sends a single command to the device *without* spawning a shell.
+     excomm - Sends Chronic Dev's + Geohot's latest usb exploit.
+     applesupport - Get all apples devices manufacturer's details
+     usbres - Reset USB
+     batscript - this allows you to send commands to iBoot from a pre written list of commands, this also supports scripting such as /auto-boot and /upload <file>
+     rawcomm - You can now send raw commands via the -x21 -x40 or -xA1 flags. type rawhelp to view supported raw commands
+     rchelp - see a list of available recovery commands and their functionality
+     rawhelp - see a list of available recovery raw commands
+     """
+     self.terminal.print_to_terminal(help_message)
+       
      
     def create_center_column(self, width):
         container2 = tk.Frame(self.frame, width=width, bg="#0a0a0a")
@@ -657,14 +731,16 @@ class CustomTerminal:
             "sshelp": self.gui.sshrd_sshelp,
             
             # Commands for iRecovery
+            "exitrec": self.gui.exit_recovery_mode,
             "ufile": self.gui.upload_file,
             "2wayshell": self.gui.two_way_shell,
             "sincomm": self.gui.single_command,
             "excomm": self.gui.exploit_command,
-            "autoboot": self.gui.enable_auto_boot,
+            "applesupport": self.gui.apple_support,
             "usbres": self.gui.usb_reset,
             "batscript": self.gui.batch_scripting,
             "rawcomm": self.gui.raw_commands,
+            "rchelp": self.gui.irecovery_help,
         }
 
     def input_prompt(self):
@@ -741,7 +817,7 @@ class CustomTerminal:
          "2wayshell": "Start a two-way shell",
          "sincomm": "Execute a single command",
          "excomm": "Exploit a command",
-         "autoboot": "Enable auto-boot",
+         "applesupport": "Apple devices developer details",
          "usbres": "Reset USB connection",
          "batscript": "Execute batch scripting",
          "rawcomm": "Execute raw commands",
