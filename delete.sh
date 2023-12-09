@@ -4,7 +4,7 @@ progress() {
   local progress_char="#"
   local width=10
 
-  printf "\nProgress: ["
+  printf "Progress: ["
   for ((i = 0; i < width; i++)); do
     printf "$progress_char"
     sleep $duration

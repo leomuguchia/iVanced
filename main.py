@@ -15,7 +15,8 @@ from tkinter import ttk
 from tkinter import Tk, StringVar, OptionMenu, Label, Entry, Button, CENTER
 import json
 import re
-from ansi2html import Ansi2HTMLConverter
+from tkinter import scrolledtext
+from pyusb import USBMux
 
 class GuiApp:
     def __init__(self, master):
@@ -24,7 +25,13 @@ class GuiApp:
         master.geometry("1200x700")  # Set the width to 1200 pixels
         master.resizable(False, False)  # Allow resizing
         self.current_folder = "[iVanced]-[~]"
-
+        
+        # Set the default active tab
+        self.active_tab = "Quick usage"
+        
+        # Create an instance of USBMux
+        usb_mux = USBMux()
+        
         # Create frames
         self.frame = tk.Frame(master, bg="#0a0a0a")
         self.frame.pack(fill=tk.BOTH, expand=True)
@@ -34,6 +41,7 @@ class GuiApp:
         self.create_widgets()
         
         self.is_user_input_required = False
+        
 
     def set_user_input_required(self, value):
         self.is_user_input_required = value
@@ -48,7 +56,7 @@ class GuiApp:
 
     def create_header(self):
         header_container = tk.Frame(self.frame, height=80, bg="#111111")
-        header_container.pack(side="top", fill="x", pady=(10, 0))
+        header_container.pack(side="top", fill="x")
         logo_path = "profile.png"
         logo_img = Image.open(logo_path)
         logo_img = logo_img.resize((80, 80), Image.NEAREST)
@@ -85,7 +93,7 @@ class GuiApp:
                 container1,
                 text=text,
                 command=command,  # Remove the lambda function
-                width=25,
+                width=22,
                 height=2,
                 bg="#0a0a0a",
                 fg="#4CAF50",
@@ -98,6 +106,31 @@ class GuiApp:
             )
             button.pack(pady=(5, 5), padx=10, anchor="e")
 
+    def display_device_info(self):
+        # Check if there are devices
+        if not self.usb_mux.devices:
+            # No devices connected
+            Label(self.root, text="No device connected", font=("Helvetica", 16)).pack(pady=20)
+        else:
+            # Devices connected
+            for device in self.usb_mux.devices:
+                device_frame = tk.Frame(self.root, pady=10)
+
+                # Create a label for the smartphone icon (replace with your icon)
+                smartphone_icon = PhotoImage(file="smartphone_icon.png")
+                smartphone_label = Label(device_frame, image=smartphone_icon)
+                smartphone_label.image = smartphone_icon
+                smartphone_label.grid(row=0, column=0, padx=10)
+
+                # Display device details horizontally
+                details_label = Label(device_frame, text=f"Device ID: {device.devid}\n"
+                                                         f"Serial Number: {device.serial}\n"
+                                                         f"Product ID: {device.usbprod}\n"
+                                                         f"Location ID: {device.location}")
+                details_label.grid(row=0, column=1)
+
+                # Pack the device frame
+                device_frame.pack()
 
     def run_terminal_command(self, command_function, *command_args, callback=None):
      try:
@@ -151,7 +184,7 @@ class GuiApp:
  
      def handle_interrupt(signum, frame):
          # Handle keyboard interrupt (Ctrl+C)
-         self.terminal.print_to_terminal("Command interrupted.")
+         self.terminal.print_to_terminal("Process interrupted.")
          process.terminate()
          os.killpg(process.pid, signal.SIGTERM)  # Send signal to the whole process group
          process.wait()
@@ -313,7 +346,7 @@ class GuiApp:
              command=lambda c=choice: self.handle_palera1n_choice(option_widget, c),
              width=15,
              height=2,
-             bg="#111111",
+             bg="#0a0a0a",
              fg="green",
              relief=tk.FLAT,
              borderwidth=1,  # Border width set to 1
@@ -377,13 +410,13 @@ class GuiApp:
          return
 
      # Form subprocess commands
-     command_args_clean = ["bash", "./sshrd.sh", "clean"]
+    #  command_args_clean = ["bash", "./sshrd.sh", "clean"]
      command_args_load = ["bash", "./sshrd.sh", str(iOSVer)]
      command_args_boot = ["bash", "./sshrd.sh", "boot"]
 
      # Execute subprocess commands
      self.terminal.print_to_terminal("▌║█║▌│║▌│║▌║▌█║🇷​​🇦​​🇲​​🇩​​🇮​​🇸​​🇰​▌│║▌║▌│║║▌█║▌║█\n")
-     self.run_terminal_command(*command_args_clean,callback=self.terminal.input_prompt)
+    #  self.run_terminal_command(*command_args_clean,callback=self.terminal.input_prompt)
      self.run_terminal_command(*command_args_load,callback=self.terminal.input_prompt)
      self.run_terminal_command(*command_args_boot,callback=self.terminal.input_prompt)
 
@@ -464,7 +497,7 @@ class GuiApp:
         if result == "yes":
             # Define command_args_clean
             command_args_clean = ["bash", "./sshrd.sh", "reset"]
-            self.terminal.print_to_terminal("\nresetting device..\n")
+            self.terminal.print_to_terminal("\nresetting device..")
             self.run_terminal_command(*command_args_clean, callback=self.terminal.input_prompt)
 
     def sshrd_reboot(self,args=None):
@@ -513,7 +546,7 @@ class GuiApp:
     #iRecovery tool commands
     def exit_recovery_mode(self, args=None):
      command_function = self.exit_recovery_mode
-     command_args = ["./device/irecovery", "-s"]
+     command_args = ["./device/irecovery", "-n"]
      self.run_terminal_command(command_function, *command_args)
          
     def upload_file(self, file_path):
@@ -532,9 +565,9 @@ class GuiApp:
      command_args = ["./device/irecovery", "-c", custom_command]
      self.run_terminal_command(command_function, *command_args)
 
-    def exploit_command(self, args=None):
-     command_function = self.exploit_command
-     command_args = ["./device/irecovery", "-e"]
+    def query_device(self, args=None):
+     command_function = self.query_device
+     command_args = ["./device/irecovery", "-q"]
      self.run_terminal_command(command_function, *command_args)
 
     def apple_support(self, args=None):
@@ -550,13 +583,13 @@ class GuiApp:
 
     def batch_scripting(self, script_file):
      command_function = self.batch_scripting
-     command_args = ["./device/irecovery", "-b", script_file]
+     command_args = ["./device/irecovery", "-e", script_file]
      self.run_terminal_command(command_function, *command_args)
  
     def raw_commands(self, raw_command):
-     command_function = self.raw_commands
-     command_args = ["./device/irecovery", "-x21", "-x40", "-xA1", raw_command]
-     self.run_terminal_command(command_function, *command_args)
+        flag = input("Choose flag: [-x21, -x40, -xA1] ")
+        command_args = ["./device/irecovery", flag, raw_command]
+        self.run_terminal_command(*command_args)
   
     def irecovery_help(self, args=None):
      help_message = """
@@ -615,23 +648,26 @@ class GuiApp:
         }
 
         # Create buttons dynamically
+        self.tab_buttons = {}  # Dictionary to store button references
+
         for text, tab in tabs.items():
             button = tk.Button(
                 buttons_frame,
                 text=text,
-                command=lambda t=tab: self.show_tab(t),
+                command=lambda t=tab, b=text: self.show_tab(t, b),
                 width=10,
                 height=2,
-                bg="#111111",
-                fg="white",
                 relief=tk.FLAT,
-                borderwidth=2,
                 pady=2,
                 padx=2,
                 bd=0,
                 anchor="center",
             )
             button.pack(side="left", padx=5)  # Set side to "left"
+            self.tab_buttons[text] = button  # Store button reference
+
+        # Show the default active tab
+        self.show_tab(tabs[self.active_tab], self.active_tab)
 
     def create_tab(self, parent, content):
         tab = tk.Frame(parent, bg="#0a0a0a")
@@ -641,12 +677,20 @@ class GuiApp:
             label.pack(anchor="w")
         return tab
 
-    def show_tab(self, tab):
+    def show_tab(self, tab, button_text):
         # Hide all tabs
         for child in tab.master.winfo_children():
             child.pack_forget()
+
         # Show the selected tab
         tab.pack(fill=tk.BOTH, expand=True)
+
+        # Highlight the active button
+        for text, button in self.tab_buttons.items():
+            if text == button_text:
+                button.configure(bg="#333333")  # Change the background color of the active button
+            else:
+                button.configure(bg="#0a0a0a")  # Reset background color for other buttons
 
         
 class CustomTerminal:
@@ -659,6 +703,7 @@ class CustomTerminal:
 
         self.initial_working_directory = os.getcwd()
         self.current_folder = self.initial_working_directory
+        self.text_widget.bind("<BackSpace>", self.handle_backspace)
 
         # Add the Figlet header with the new ASCII art and horizontal line
         figlet_header = self.generate_figlet_header("iShell", font="small")
@@ -677,25 +722,26 @@ class CustomTerminal:
         self.input_prompt()
 
     def setup_text_widget(self):
-        visible_lines = 20  # Adjust this based on your preference
-        extra_lines_at_bottom = 5  # Adjust this based on how many extra lines you want at the bottom
-        total_height = visible_lines + extra_lines_at_bottom
+     visible_lines = 20  # Adjust this based on your preference
+     extra_lines_at_bottom = 5  # Adjust this based on how many extra lines you want at the bottom
+     total_height = visible_lines + extra_lines_at_bottom
 
-        self.text_widget = tk.Text(
-            self.master,
-            wrap=tk.WORD,
-            font=("Courier", 12),
-            bg="black",
-            fg="white",
-            insertbackground="white",
-            insertwidth=4,
-            width=55,
-            height=total_height,  # Set the total height
-            highlightthickness=0,  # Set highlightthickness to 0 to remove the border
+     self.text_widget = tk.Text(
+         self.master,
+         wrap=tk.WORD,
+         font=("Courier", 12),
+         bg="black",
+         fg="white",
+         insertbackground="white",
+         insertwidth=4,
+         width=58,
+         height=total_height,  # Set the total height
+         bd=1,  
+         highlightthickness=0,
         )
-        self.text_widget.pack(expand=True, fill="both", pady=(0, 20))
-        self.text_widget.tag_config("header", foreground="yellow")
-        self.text_widget.tag_config("input", foreground="green")
+     self.text_widget.pack(expand=True, fill="both", pady=(5, 0))
+     self.text_widget.tag_config("header", foreground="grey")
+     self.text_widget.tag_config("input", foreground="green")
     
 
     def setup_commands(self):
@@ -721,7 +767,7 @@ class CustomTerminal:
             "ufile": self.gui.upload_file,
             "2wayshell": self.gui.two_way_shell,
             "sincomm": self.gui.single_command,
-            "excomm": self.gui.exploit_command,
+            "device?": self.gui.query_device,
             "applesupport": self.gui.apple_support,
             "usbres": self.gui.usb_reset,
             "batscript": self.gui.batch_scripting,
@@ -734,41 +780,30 @@ class CustomTerminal:
      prompt_text = f"\n[{current_folder_name}] > "
      self.text_widget.insert(tk.END, prompt_text, "input_prompt")
      self.text_widget.tag_configure("input_prompt", foreground="#00FF00")  # Set color for the input prompt
+     self.text_widget.tag_config("folder", foreground="white")
+     self.text_widget.tag_config("file", foreground="grey")
      self.text_widget.see(tk.END)
      self.text_widget.bind("<Return>", self.process_user_input)
+
      # Set the focus on the text widget
      self.text_widget.focus_set()
+     
+    def handle_backspace(self, event):
+     # Get the current cursor position
+     cursor_position = self.text_widget.index(tk.CURRENT)
+
+     # Check if the cursor is not at the start of the current line
+     if not cursor_position.endswith(".0"):
+         # Delete the character to the left of the cursor
+         self.text_widget.delete(tk.CURRENT + "-1c", tk.CURRENT)
 
 
     def process_user_input(self, event):
      user_input = self.text_widget.get("end-2l lineend", tk.END).strip()
 
-     # Handle backspace key press
-     if not user_input:
-         self.handle_backspace(event)
-         return
-
      self.text_widget.delete("end-1l linestart", tk.END)  # Remove input prompt
      self.execute_command(user_input)
      self.input_prompt()
-
-
-    def handle_backspace(self, event):
-     # Get the current cursor position
-     current_position = self.text_widget.index(tk.INSERT)
-
-     # Get the start position of user input (end of the previous line)
-     user_input_start = self.text_widget.index("end-2l lineend +1c")
-
-     # If the cursor is before the user input, do nothing
-     if current_position < user_input_start:
-         return "break"
- 
-     # If there is user input, delete the character before the cursor
-     if current_position > user_input_start:
-         self.text_widget.delete(current_position + "1c", current_position)
-
-     return "break"
 
 
     def execute_command(self, user_input):
@@ -802,7 +837,7 @@ class CustomTerminal:
          "ufile": "Upload a file",
          "2wayshell": "Start a two-way shell",
          "sincomm": "Execute a single command",
-         "excomm": "Exploit a command",
+         "device?": "query device info",
          "applesupport": "Apple devices developer details",
          "usbres": "Reset USB connection",
          "batscript": "Execute batch scripting",
@@ -843,47 +878,28 @@ class CustomTerminal:
 
 
     def ls_command(self, args):
-        folder = args[0] if args else self.current_folder
+     folder = args[0] if args else self.current_folder
+ 
+     try:
+         contents = sorted(os.listdir(folder))
+ 
+         # Separate folders and files
+         folders = [item for item in contents if os.path.isdir(os.path.join(folder, item))]
+         files = [item for item in contents if os.path.isfile(os.path.join(folder, item))]
+ 
+         # Print folders at the top
+         for folder_name in folders:
+             self.print_to_terminal(f"{folder_name}/", tag="folder")
+ 
+         # Print files at the bottom
+         for file_name in files:
+              self.print_to_terminal(file_name, tag="file")
+ 
+     except FileNotFoundError:
+          self.print_to_terminal(f"Directory not found: {folder}", tag="output")
 
-        try:
-            contents = sorted(os.listdir(folder))
-            terminal_width = os.get_terminal_size().columns
 
-            colored_items = []
-
-            for item in contents:
-                full_path = os.path.join(folder, item)
-                if os.path.isdir(full_path):
-                    colored_items.append(f"\033[1;34m{item}\033[0m  ")  # Blue color for directories
-                else:
-                    colored_items.append(f"{item}  ")
-
-            formatted_items = "".join(colored_items)
-            lines = self.wrap_text(formatted_items, terminal_width)
-
-            for line in lines:
-                self.print_to_terminal(line.rstrip())
-
-        except FileNotFoundError:
-            self.print_to_terminal(f"Directory not found: {folder}", tag="output")
-
-    def wrap_text(self, text, width):
-        lines = []
-        current_line = ""
-
-        for word in text.split():
-            if len(current_line) + len(word) <= width:
-                current_line += word + " "
-            else:
-                lines.append(current_line)
-                current_line = word + " "
-
-        if current_line:
-            lines.append(current_line)
-
-        return lines
-        
-        
+      
     def print_to_terminal(self, command_name, message="", tag="output"):
      if message:
          self.text_widget.insert(tk.END, f"{command_name}\n{message}\n", tag)
