@@ -111,10 +111,9 @@ class GuiApp:
                  if line:
                      # Check for subprocess request for user input
                      if self.is_user_input_required:
-                         print(f"Subprocess requires user input: \n{line}")
+                         self.terminal.print_to_terminal(f"Subprocess requires user input: \n{line}")
                      else:
                          self.terminal.print_to_terminal(f"\n{line}", tag="output")
-                         print(line)
                          self.master.update_idletasks()  # Update the Tkinter GUI
  
                      self.master.after(10, update_terminal)  # Schedule the next update
@@ -486,11 +485,11 @@ class GuiApp:
         command_args = ["bash", "./ramdisk/sshrd.sh", "ssh"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
-    def sshrd_mount_file_systems(self):
+    def sshrd_mount_file_systems(self,args=None):
         command_args = ["bash", "./ramdisk/sshrd.sh", "mount_filesystems"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
-    def sshrd_boot(self):
+    def sshrd_boot(self,args=None):
         command_args = ["bash", "./ramdisk/sshrd.sh", "boot"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
@@ -530,37 +529,31 @@ class GuiApp:
      command_function = self.single_command
      command_args = ["./device/irecovery", "-c", custom_command]
      self.run_terminal_command(command_function, *command_args)
-     self.terminal.input_prompt()
 
     def exploit_command(self, args=None):
      command_function = self.exploit_command
      command_args = ["./device/irecovery", "-e"]
      self.run_terminal_command(command_function, *command_args)
-     self.terminal.input_prompt()
 
     def apple_support(self, args=None):
      command_function = self.apple_support
      command_args = ["./device/irecovery", "-a"]
      self.run_terminal_command(command_function, *command_args)
-     self.terminal.input_prompt()
  
     def usb_reset(self, args=None):
      command_function = self.usb_reset
      command_args = ["./device/irecovery", "-r"]
      self.run_terminal_command(command_function, *command_args)
-     self.terminal.input_prompt()
 
     def batch_scripting(self, script_file):
      command_function = self.batch_scripting
      command_args = ["./device/irecovery", "-b", script_file]
      self.run_terminal_command(command_function, *command_args)
-     self.terminal.input_prompt()
  
     def raw_commands(self, raw_command):
      command_function = self.raw_commands
      command_args = ["./device/irecovery", "-x21", "-x40", "-xA1", raw_command]
      self.run_terminal_command(command_function, *command_args)
-     self.terminal.input_prompt()
   
     def irecovery_help(self, args=None):
      help_message = """
@@ -578,21 +571,6 @@ class GuiApp:
      """
      self.terminal.print_to_terminal(help_message)
      self.terminal.input_prompt()
-     
-    def irecovery_raw(self, args=None):
-     help_message = """
-     ufile - You can upload a file to 0x9000000
-     2wayshell - You can spawn a shell to do all sorts of neat things Once it has spawned, you can type 'help' and iBoot will respond with its built-in command list
-     sincomm - Sends a single command to the device *without* spawning a shell.
-     excomm - Sends Chronic Dev's + Geohot's latest usb exploit.
-     applesupport - Get all apples devices manufacturer's details
-     usbres - Reset USB
-     batscript - this allows you to send commands to iBoot from a pre written list of commands, this also supports scripting such as /auto-boot and /upload <file>
-     rawcomm - You can now send raw commands via the -x21 -x40 or -xA1 flags. type rawhelp to view supported raw commands
-     rchelp - see a list of available recovery commands and their functionality
-     rawhelp - see a list of available recovery raw commands
-     """
-     self.terminal.print_to_terminal(help_message)
        
      
     def create_center_column(self, width):

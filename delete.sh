@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Function to display a simple progress bar
 progress() {
   local duration=0.1  # Adjust the duration as needed

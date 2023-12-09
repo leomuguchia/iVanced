@@ -1,5 +1,3 @@
-#!/bin/bash
-
 rm -rf ~/.ssh/known_hosts
 
 cd "$(dirname "$0")" || exit
