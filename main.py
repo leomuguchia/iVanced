@@ -15,6 +15,7 @@ from tkinter import ttk
 from tkinter import Tk, StringVar, OptionMenu, Label, Entry, Button, CENTER
 import json
 import re
+from ansi2html import Ansi2HTMLConverter
 
 class GuiApp:
     def __init__(self, master):
@@ -368,6 +369,7 @@ class GuiApp:
          if iOSVer < 12 or iOSVer > 16:
              self.terminal.print_to_terminal("Only supports iOS 12 - 16")
              self.terminal.input_prompt()
+             return  
      except ValueError:
          # Invalid iOS version, prompt the user to enter a valid number
          self.terminal.print_to_terminal("Only supports iOS 12 - 16")
@@ -375,12 +377,12 @@ class GuiApp:
          return
 
      # Form subprocess commands
-     command_args_clean = ["bash", "./ramdisk/sshrd.sh", "clean"]
-     command_args_load = ["bash", "./ramdisk/sshrd.sh", str(iOSVer)]
-     command_args_boot = ["bash", "./ramdisk/sshrd.sh", "boot"]
+     command_args_clean = ["bash", "./sshrd.sh", "clean"]
+     command_args_load = ["bash", "./sshrd.sh", str(iOSVer)]
+     command_args_boot = ["bash", "./sshrd.sh", "boot"]
 
      # Execute subprocess commands
-     self.terminal.print_to_terminal("----ramdisk----\n")
+     self.terminal.print_to_terminal("▌║█║▌│║▌│║▌║▌█║🇷​​🇦​​🇲​​🇩​​🇮​​🇸​​🇰​▌│║▌║▌│║║▌█║▌║█\n")
      self.run_terminal_command(*command_args_clean,callback=self.terminal.input_prompt)
      self.run_terminal_command(*command_args_load,callback=self.terminal.input_prompt)
      self.run_terminal_command(*command_args_boot,callback=self.terminal.input_prompt)
@@ -461,36 +463,36 @@ class GuiApp:
 
         if result == "yes":
             # Define command_args_clean
-            command_args_clean = ["bash", "./ramdisk/sshrd.sh", "reset"]
+            command_args_clean = ["bash", "./sshrd.sh", "reset"]
             self.terminal.print_to_terminal("\nresetting device..\n")
             self.run_terminal_command(*command_args_clean, callback=self.terminal.input_prompt)
 
     def sshrd_reboot(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "reboot"]
+        command_args = ["bash", "./sshrd.sh", "reboot"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_reset(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "reset"]
+        command_args = ["bash", "./sshrd.sh", "reset"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_dump_blobs(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "dump-blobs"]
+        command_args = ["bash", "./sshrd.sh", "dump-blobs"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_clean(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "clean"]
+        command_args = ["bash", "./sshrd.sh", "clean"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_ssh(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "ssh"]
+        command_args = ["bash", "./sshrd.sh", "ssh"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_mount_file_systems(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "mount_filesystems"]
+        command_args = ["bash", "./sshrd.sh", "mount_filesystems"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_boot(self,args=None):
-        command_args = ["bash", "./ramdisk/sshrd.sh", "boot"]
+        command_args = ["bash", "./sshrd.sh", "boot"]
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_sshelp(self, args=None):
@@ -539,6 +541,7 @@ class GuiApp:
      command_function = self.apple_support
      command_args = ["./device/irecovery", "-a"]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
  
     def usb_reset(self, args=None):
      command_function = self.usb_reset
@@ -590,25 +593,33 @@ class GuiApp:
 
         # Buttons Frame
         buttons_frame = tk.Frame(container3, bg="#0a0a0a")
-        buttons_frame.pack(pady=(5, 5))
+        buttons_frame.pack(pady=(5, 5), side="top")  # Set side to "top"
 
         # Instructions Frame
         instructions_frame = tk.Frame(container3, bg="#0a0a0a")
-        instructions_frame.pack(side="top", pady=(5, 5))
+        instructions_frame.pack(side="top", pady=(5, 5), fill=tk.BOTH, expand=True)  # Set fill and expand
 
-        # Define the buttons_info list
-        buttons_info = [
-            # ("Terminal", self.terminal),
-            # ("Jailbreaks", self.jailbreak),
-            # ("Manual", self.manual),
-        ]
+        # Create a frame for each tab
+        tabs = {
+            "Quick usage": self.create_tab(instructions_frame, [
+                "**********Quick Flash*********\n\n"
+                "Step 1: Connect your iPhone",
+                "Step 2: Enter recovery mode then DFU ",
+                "set up more instructions here....",
+                "set up more instructions here....",
+                "set up more instructions here...."
+            ]),
+            "Supported": self.create_tab(instructions_frame, ["Supported content"]),
+            "Jailbreaks": self.create_tab(instructions_frame, ["Jailbreaks content"]),
+            "Manual": self.create_tab(instructions_frame, ["Manual content"]),
+        }
 
-        # Create smaller, horizontally aligned buttons with grey background and border radius
-        for text, command in buttons_info:
+        # Create buttons dynamically
+        for text, tab in tabs.items():
             button = tk.Button(
                 buttons_frame,
                 text=text,
-                command=command,
+                command=lambda t=tab: self.show_tab(t),
                 width=10,
                 height=2,
                 bg="#111111",
@@ -620,25 +631,24 @@ class GuiApp:
                 bd=0,
                 anchor="center",
             )
-            button.pack(side="left", padx=5)
+            button.pack(side="left", padx=5)  # Set side to "left"
 
-        # Instructions labels with text wrapping
-        instructions = [
-            "**********Quick Flash*********\n\n"
-            "Step 1: Connect your iPhone",
-            "Step 2: Enter recovery mode then DFU ",
-            
-            "set up more instructions here....",
-            "set up more instructions here....",
-            "set up more instructions here...."
-        ]
-
-        for instruction in instructions:
-            label = tk.Label(instructions_frame, text=instruction, fg="#FFA500", bg="#0a0a0a", justify="left", padx=20,
+    def create_tab(self, parent, content):
+        tab = tk.Frame(parent, bg="#0a0a0a")
+        for instruction in content:
+            label = tk.Label(tab, text=instruction, fg="#FFA500", bg="#0a0a0a", justify="left", padx=20,
                              pady=5, wraplength=350)
             label.pack(anchor="w")
+        return tab
 
+    def show_tab(self, tab):
+        # Hide all tabs
+        for child in tab.master.winfo_children():
+            child.pack_forget()
+        # Show the selected tab
+        tab.pack(fill=tk.BOTH, expand=True)
 
+        
 class CustomTerminal:
     def __init__(self, master,gui):
         self.master = master
@@ -677,17 +687,15 @@ class CustomTerminal:
             font=("Courier", 12),
             bg="black",
             fg="white",
+            insertbackground="white",
+            insertwidth=4,
             width=55,
             height=total_height,  # Set the total height
             highlightthickness=0,  # Set highlightthickness to 0 to remove the border
         )
         self.text_widget.pack(expand=True, fill="both", pady=(0, 20))
-
-    def print_colored(self, text, color="white"):
-        colored_text = f"\033[{color}m{text}\033[0m"
-        self.text_widget.insert(tk.END, colored_text)
-
-
+        self.text_widget.tag_config("header", foreground="yellow")
+        self.text_widget.tag_config("input", foreground="green")
     
 
     def setup_commands(self):
@@ -839,7 +847,7 @@ class CustomTerminal:
 
         try:
             contents = sorted(os.listdir(folder))
-            max_line_width = 80
+            terminal_width = os.get_terminal_size().columns
 
             colored_items = []
 
@@ -851,13 +859,29 @@ class CustomTerminal:
                     colored_items.append(f"{item}  ")
 
             formatted_items = "".join(colored_items)
-            lines = [formatted_items[i:i + max_line_width] for i in range(0, len(formatted_items), max_line_width)]
+            lines = self.wrap_text(formatted_items, terminal_width)
 
             for line in lines:
                 self.print_to_terminal(line.rstrip())
 
         except FileNotFoundError:
             self.print_to_terminal(f"Directory not found: {folder}", tag="output")
+
+    def wrap_text(self, text, width):
+        lines = []
+        current_line = ""
+
+        for word in text.split():
+            if len(current_line) + len(word) <= width:
+                current_line += word + " "
+            else:
+                lines.append(current_line)
+                current_line = word + " "
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
         
         
     def print_to_terminal(self, command_name, message="", tag="output"):
