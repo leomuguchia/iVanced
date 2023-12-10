@@ -25,15 +25,15 @@ class GuiApp:
         master.geometry("1200x700")  # Set the width to 1200 pixels
         master.resizable(False, False)  # Allow resizing
         self.current_folder = "[iVanced]-[~]"
-        
+        # Create an instance of USBMux
+        self.usb_mux = USBMux()
         # Set the default active tab
         self.active_tab = "Quick usage"
         
-        # Create an instance of USBMux
-        usb_mux = USBMux()
+        
         
         # Create frames
-        self.frame = tk.Frame(master, bg="#0a0a0a")
+        self.frame = tk.Frame(master, bg="#111111")
         self.frame.pack(fill=tk.BOTH, expand=True)
 
         # Create and place widgets
@@ -76,7 +76,7 @@ class GuiApp:
 
     def create_left_column(self, width):
         container1 = tk.Frame(self.frame, width=width, bg="#0a0a0a")
-        container1.pack(side="left", fill=tk.BOTH, expand=False)
+        container1.pack(side="left", fill=tk.BOTH, expand=False, padx=(0,3))
 
         buttons_info = [
             ("iOS Activation", self.show_activation_popup),
@@ -106,31 +106,6 @@ class GuiApp:
             )
             button.pack(pady=(5, 5), padx=10, anchor="e")
 
-    def display_device_info(self):
-        # Check if there are devices
-        if not self.usb_mux.devices:
-            # No devices connected
-            Label(self.root, text="No device connected", font=("Helvetica", 16)).pack(pady=20)
-        else:
-            # Devices connected
-            for device in self.usb_mux.devices:
-                device_frame = tk.Frame(self.root, pady=10)
-
-                # Create a label for the smartphone icon (replace with your icon)
-                smartphone_icon = PhotoImage(file="smartphone_icon.png")
-                smartphone_label = Label(device_frame, image=smartphone_icon)
-                smartphone_label.image = smartphone_icon
-                smartphone_label.grid(row=0, column=0, padx=10)
-
-                # Display device details horizontally
-                details_label = Label(device_frame, text=f"Device ID: {device.devid}\n"
-                                                         f"Serial Number: {device.serial}\n"
-                                                         f"Product ID: {device.usbprod}\n"
-                                                         f"Location ID: {device.location}")
-                details_label.grid(row=0, column=1)
-
-                # Pack the device frame
-                device_frame.pack()
 
     def run_terminal_command(self, command_function, *command_args, callback=None):
      try:
@@ -548,27 +523,32 @@ class GuiApp:
      command_function = self.exit_recovery_mode
      command_args = ["./device/irecovery", "-n"]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
          
     def upload_file(self, file_path):
      command_function = self.upload_file
      file_path = filedialog.askopenfilename(title="Select a file")
      command_args = ["./device/irecovery", "-f", file_path]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
     def two_way_shell(self, args=None):
      command_function = self.two_way_shell
      command_args = ["./device/irecovery", "-s"]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
     def single_command(self, custom_command):
      command_function = self.single_command
      command_args = ["./device/irecovery", "-c", custom_command]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
     def query_device(self, args=None):
      command_function = self.query_device
      command_args = ["./device/irecovery", "-q"]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
     def apple_support(self, args=None):
      command_function = self.apple_support
@@ -580,16 +560,19 @@ class GuiApp:
      command_function = self.usb_reset
      command_args = ["./device/irecovery", "-r"]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
 
     def batch_scripting(self, script_file):
      command_function = self.batch_scripting
      command_args = ["./device/irecovery", "-e", script_file]
      self.run_terminal_command(command_function, *command_args)
+     self.terminal.input_prompt()
  
     def raw_commands(self, raw_command):
         flag = input("Choose flag: [-x21, -x40, -xA1] ")
         command_args = ["./device/irecovery", flag, raw_command]
         self.run_terminal_command(*command_args)
+        self.terminal.input_prompt()
   
     def irecovery_help(self, args=None):
      help_message = """
@@ -621,16 +604,16 @@ class GuiApp:
         self.terminal = CustomTerminal(self.terminal_frame, self)
 
     def create_right_column(self, width):
-        container3 = tk.Frame(self.frame, width=width, bg="#0a0a0a")
-        container3.pack(side="left", fill=tk.BOTH, expand=True)
+        container3 = tk.Frame(self.frame, width=width, bg="#111111")
+        container3.pack(side="left", fill=tk.BOTH, expand=True, padx=(3,0))
 
         # Buttons Frame
-        buttons_frame = tk.Frame(container3, bg="#0a0a0a")
-        buttons_frame.pack(pady=(5, 5), side="top")  # Set side to "top"
+        buttons_frame = tk.Frame(container3, bg="#111111")
+        buttons_frame.pack(pady=(0, 3), side="top")  # Set side to "top"
 
         # Instructions Frame
         instructions_frame = tk.Frame(container3, bg="#0a0a0a")
-        instructions_frame.pack(side="top", pady=(5, 5), fill=tk.BOTH, expand=True)  # Set fill and expand
+        instructions_frame.pack(side="top", fill=tk.BOTH, expand=True)  # Set fill and expand
 
         # Create a frame for each tab
         tabs = {
@@ -640,7 +623,7 @@ class GuiApp:
                 "Step 2: Enter recovery mode then DFU ",
                 "set up more instructions here....",
                 "set up more instructions here....",
-                "set up more instructions here...."
+                "set up more instructions here....\n\n\n\n\n\n",
             ]),
             "Supported": self.create_tab(instructions_frame, ["Supported content"]),
             "Jailbreaks": self.create_tab(instructions_frame, ["Jailbreaks content"]),
@@ -668,6 +651,28 @@ class GuiApp:
 
         # Show the default active tab
         self.show_tab(tabs[self.active_tab], self.active_tab)
+        
+        # Create a frame for device details with a border
+        self.right_device_details_container = tk.Frame(container3, bg="#0a0a0a")
+        self.right_device_details_container.pack(side="bottom", pady=(5, 0), fill=tk.BOTH, expand=True)
+ 
+        # Create a smaller smartphone icon
+        self.smartphone_icon = tk.PhotoImage(file="iphone.png").subsample(3)  
+        smartphone_label = tk.Label(self.right_device_details_container, image=self.smartphone_icon, bg="#0a0a0a")
+        smartphone_label.image = self.smartphone_icon
+        smartphone_label.grid(row=0, column=0, padx=5, pady=(10, 0))  # Added pady for spacing
+
+        # Display the number of devices below the smartphone icon
+        device_count_label = tk.Label(self.right_device_details_container, text={len(self.usb_mux.devices)}, fg="gray", bg="#0a0a0a")
+        device_count_label.grid(row=1, column=0, padx=5, pady=(0, 10))
+        
+        # Display device details vertically
+        self.device_details_label = tk.Label(self.right_device_details_container, text="", font=("Helvetica", 12),
+                                             fg="gray", bg="#0a0a0a", justify="left", padx=20, pady=5, wraplength=200)
+        self.device_details_label.grid(row=0, column=1)
+
+        # Show the default message
+        self.display_device_info()
 
     def create_tab(self, parent, content):
         tab = tk.Frame(parent, bg="#0a0a0a")
@@ -690,9 +695,57 @@ class GuiApp:
             if text == button_text:
                 button.configure(bg="#333333")  # Change the background color of the active button
             else:
-                button.configure(bg="#0a0a0a")  # Reset background color for other buttons
+                button.configure(bg="#0a0a0a")  # Reset background color for other buttons               
+     
+    def display_device_info(self):
+     # Check if there are devices
+     if not self.usb_mux.devices:
+         # No devices connected
+         self.device_details_label.config(text="No device connected")
+     else:
+         # Devices connected
+         device = self.usb_mux.devices[0]  # Display details of the first connected device
+         details_text = f"Device ID: {device.devid}\n" \
+                        f"Serial Number: {device.serial}\n" \
+                        f"Product ID: {device.usbprod}\n" \
+                        f"Location ID: {device.location}"
 
-        
+         # Check the device state (assuming there is a method to get the state)
+         device_state = self.get_device_state(device)  # Replace with actual method
+         details_text += f"\nDevice State: {device_state}"
+ 
+         self.device_details_label.config(text=details_text)
+ 
+    def get_device_state(self, device):
+     # Replace this with the actual method to get the device state
+     # For example, you might use device properties like device.serial or device.usbprod
+     # to determine the state, or use additional methods from the USBMux class.
+     return "Unknown"
+    
+    def create_tab(self, parent, content):
+         tab = tk.Frame(parent, bg="#0a0a0a")
+         for instruction in content:
+             label = tk.Label(tab, text=instruction, fg="#FFA500", bg="#0a0a0a", justify="left", padx=20,
+                              pady=5, wraplength=350)
+             label.pack(anchor="w")
+         return tab
+
+    def show_tab(self, tab, button_text):
+         # Hide all tabs
+         for child in tab.master.winfo_children():
+             child.pack_forget()
+ 
+         # Show the selected tab
+         tab.pack(fill=tk.BOTH, expand=True)
+ 
+         # Highlight the active button
+         for text, button in self.tab_buttons.items():
+             if text == button_text:
+                 button.configure(bg="#333333")  # Change the background color of the active button
+             else:
+                 button.configure(bg="#0a0a0a")  # Reset background color for other buttons
+    
+                
 class CustomTerminal:
     def __init__(self, master,gui):
         self.master = master
@@ -736,7 +789,7 @@ class CustomTerminal:
          insertwidth=4,
          width=58,
          height=total_height,  # Set the total height
-         bd=1,  
+         bd=0,  
          highlightthickness=0,
         )
      self.text_widget.pack(expand=True, fill="both", pady=(5, 0))

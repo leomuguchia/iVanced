@@ -9,7 +9,7 @@ progress() {
     printf "$progress_char"
     sleep $duration
   done
-  printf "....]\n"
+  printf "....]"
 }
 
 # Log function with timestamp
