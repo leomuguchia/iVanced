@@ -18,6 +18,10 @@ import re
 from tkinter import scrolledtext
 from pyusb import USBMux
 
+def clear_terminal_screen():
+    # Clear the terminal screen
+    os.system('clear' if os.name == 'posix' else 'cls')
+    
 class GuiApp:
     def __init__(self, master):
         self.master = master
@@ -63,7 +67,7 @@ class GuiApp:
         self.logo_img = ImageTk.PhotoImage(logo_img)
 
         # Software name and version labels
-        software_label = tk.Label(header_container, text="iVanced", font=("Arial", 14, "bold"), fg="#00FF00", bg="#111111")
+        software_label = tk.Label(header_container, text="iVanced", font=("Baskerville", 20, "bold"), fg="#00FF00", bg="#111111")
         version_label = tk.Label(header_container, text="Version 1.1", font=("Arial", 10), fg="#00FF00", bg="#111111")
 
         # Logo, software name, and version placement
@@ -83,9 +87,9 @@ class GuiApp:
             ("Ramdisk (iOS 14-16)", self.ramdisk),
             ("Jailbreak iOS", self.jail_break),
             ("Advanced Flash", self.smart_flash),
-            ("Exit Recovery Mode", self.exit_recovery_mode),
+            ("Recovery Mode", self.recovery_mode),
             ("My Device (All phones!)", self.check_imei),
-            ("FMI Unlock (All iphones!)", self.fmi_unlock),
+            ("FMI Unlock", self.fmi_unlock),
         ]
 
         for text, command in buttons_info:
@@ -102,7 +106,7 @@ class GuiApp:
                 pady=6,
                 padx=20,
                 bd=0,
-                anchor="e",
+                anchor="center",
             )
             button.pack(pady=(5, 5), padx=10, anchor="e")
 
@@ -343,6 +347,7 @@ class GuiApp:
 
 
     def handle_palera1n_choice(self, option_widget, user_choice):
+     self.terminal.print_to_terminal(f"[-]{user_choice}ing...")
      if user_choice == "boot":
          command_args = ["sudo", "./palera1n-linux-x86_64", "-f"]
          self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
@@ -435,7 +440,51 @@ class GuiApp:
         y = (window.winfo_screenheight() // 2) - (height // 2)
         window.geometry('{}x{}+{}+{}'.format(width, height, x, y))
 
+    def recovery_mode(self):
+     # Display the initial message in the custom terminal
+     initial_message = "Choose an option: ['enter recovery mode', 'exit recovery mode']\n"
+     self.terminal.print_to_terminal(initial_message, tag="output")
 
+     # Create a new Toplevel widget
+     choices = ["enter", "exit"]
+     option_widget = tk.Toplevel(self.master)
+     option_widget.title("Choose an option")
+     option_widget.geometry("300x50")  # Set the desired width and height
+     self.center_on_screen(option_widget)  # Center the widget on the screen
+
+     button_frame = tk.Frame(option_widget, bg="white")
+     button_frame.pack(expand=True)
+
+     for choice in choices:
+         btn = tk.Button(
+             button_frame,
+             text=choice,
+             command=lambda c=choice: self.handle_recovery_choice(option_widget, c),
+             width=15,
+             height=2,
+             bg="#0a0a0a",
+             fg="green",
+             relief=tk.FLAT,
+             borderwidth=1,  
+             pady=6,
+             padx=20,
+             bd=0,
+             activebackground="white",  
+             activeforeground="green",  
+             highlightthickness=0,  
+         )
+         btn.pack(side=tk.LEFT, padx=10, pady=10)
+
+    def handle_recovery_choice(self, option_widget, user_choice):
+     self.terminal.print_to_terminal(f"[-]{user_choice}ing...")
+     if user_choice == "enter":
+         self.enter_recovery_mode()
+     elif user_choice == "exit":
+         self.exit_recovery_mode()
+         
+     option_widget.destroy()  # Close the widget after making a choice
+     
+     
     def save_activation_files(self):
      command_function = self.save_activation_files
      command_args = ["bash", "./save.sh"]
@@ -461,6 +510,57 @@ class GuiApp:
      command_args = ["bash", "./delete.sh"]
      self.run_terminal_command(command_function, *command_args, callback=self.terminal.input_prompt)
 
+
+    def get_device_udid(self):
+        try:
+            # Run ideviceinfo to get device information
+            ideviceinfo_output = subprocess.check_output(["./device/ideviceinfo"], stderr=subprocess.STDOUT, text=True)
+
+            # Find and extract the UDID from the ideviceinfo output
+            for line in ideviceinfo_output.splitlines():
+                if "UniqueDeviceID" in line:
+                    udid = line.split(":")[1].strip()
+                    return udid
+
+            self.terminal.print_to_terminal("Error: Unable to find UDID from ideviceinfo.")
+            return None
+
+        except subprocess.CalledProcessError as e:
+            self.terminal.print_to_terminal(f"[-]{e.output}")
+            return None
+
+    # Method to enter the connected Apple device into recovery mode using ideviceenterrecovery
+    def get_recovery_mode(self, udid):
+        try:
+            # Run ideviceenterrecovery to send the device into recovery mode
+            subprocess.run(["./device/ideviceenterrecovery", udid])
+
+            self.terminal.print_to_terminal("Device sent into recovery mode successfully.")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error running ideviceenterrecovery: {e.output}")
+            return False
+        
+    def enter_recovery_mode(self):
+        # Get the device UDID
+        device_udid = self.get_device_udid()
+
+        if device_udid:
+            self.terminal.print_to_terminal(f"Device UDID: {device_udid}")
+            # Enter the device into recovery mode
+            success = self.get_recovery_mode(device_udid)
+
+            if success:
+                self.terminal.print_to_terminal("Device entered into recovery mode successfully.")
+            else:
+                self.terminal.print_to_terminal("Failed to enter the device into recovery mode.")
+        else:
+            self.terminal.print_to_terminal("Failed to get device UDID.")
+        
+        self.terminal.input_prompt()   
+            
+             
      #sshrd script commands
     def smart_flash(self):
         # Show a warning message before proceeding
@@ -625,9 +725,9 @@ class GuiApp:
                 "set up more instructions here....",
                 "set up more instructions here....\n\n\n\n\n\n",
             ]),
-            "Supported": self.create_tab(instructions_frame, ["Supported content"]),
-            "Jailbreaks": self.create_tab(instructions_frame, ["Jailbreaks content"]),
-            "Manual": self.create_tab(instructions_frame, ["Manual content"]),
+            "Device": self.create_tab(instructions_frame, ["Connected device details"]),
+            "Supported": self.create_tab(instructions_frame, ["Supported content","set up more instructions here....\n\n\n\n\n\n",]),
+            "Jailbreaks": self.create_tab(instructions_frame, ["Jailbreaks content","set up more instructions here....\n\n\n\n\n\n",],),
         }
 
         # Create buttons dynamically
@@ -642,7 +742,7 @@ class GuiApp:
                 height=2,
                 relief=tk.FLAT,
                 pady=2,
-                padx=2,
+                padx=1,
                 bd=0,
                 anchor="center",
             )
@@ -677,7 +777,7 @@ class GuiApp:
     def create_tab(self, parent, content):
         tab = tk.Frame(parent, bg="#0a0a0a")
         for instruction in content:
-            label = tk.Label(tab, text=instruction, fg="#FFA500", bg="#0a0a0a", justify="left", padx=20,
+            label = tk.Label(tab, text=instruction, fg="#FFA500", bg="#0a0a0a", justify="left", padx=10,
                              pady=5, wraplength=350)
             label.pack(anchor="w")
         return tab
@@ -768,9 +868,9 @@ class CustomTerminal:
             "This tool is for educational and testing purposes only. "
             "Usage for malicious or illegal activities is prohibited. "
             "You are solely responsible for your actions. "
-            "The author is not liable for any damage. \n"
+            "The author is not liable for any damage."
         )
-        self.print_to_terminal(welcome_message, tag="header")
+        self.print_to_terminal(f"{welcome_message}\n", tag="header")
 
         self.input_prompt()
 
@@ -830,13 +930,13 @@ class CustomTerminal:
 
     def input_prompt(self):
      current_folder_name = os.path.basename(self.current_folder)
-     prompt_text = f"\n[{current_folder_name}] > "
-     self.text_widget.insert(tk.END, prompt_text, "input_prompt")
+     prompt_text = f"[{current_folder_name}] > "
+     self.text_widget.insert(tk.END, f"\n{prompt_text}\n", "input_prompt")
      self.text_widget.tag_configure("input_prompt", foreground="#00FF00")  # Set color for the input prompt
      self.text_widget.tag_config("folder", foreground="white")
      self.text_widget.tag_config("file", foreground="grey")
      self.text_widget.see(tk.END)
-     self.text_widget.bind("<Return>", self.process_user_input)
+     self.text_widget.bind("<Return>", lambda event: self.process_user_input(event, prompt_text))
 
      # Set the focus on the text widget
      self.text_widget.focus_set()
@@ -851,16 +951,28 @@ class CustomTerminal:
          self.text_widget.delete(tk.CURRENT + "-1c", tk.CURRENT)
 
 
-    def process_user_input(self, event):
+    def process_user_input(self, event, prompt_text):
      user_input = self.text_widget.get("end-2l lineend", tk.END).strip()
+     
+     # Remove input prompt from the user input
+     command = user_input.replace(prompt_text, "").strip()
 
-     self.text_widget.delete("end-1l linestart", tk.END)  # Remove input prompt
-     self.execute_command(user_input)
+     if not command:
+         self.input_prompt()
+         return
+ 
+     # Clear the current line (input prompt and user command)
+     self.text_widget.delete("end-2l lineend", tk.END)
+ 
+     # Process the user's command
+     self.execute_command(command)
+ 
+     # Reinsert the input prompt
      self.input_prompt()
 
 
-    def execute_command(self, user_input):
-     command_parts = user_input.split()
+    def execute_command(self, command):
+     command_parts = command.split()
      command_name = command_parts[0]
 
      if command_name in self.commands:
@@ -970,6 +1082,8 @@ class CustomTerminal:
 
 
 if __name__ == "__main__":
+    clear_terminal_screen()
+    print("iVanced\nStarted...\n\npress ctrl + C to quit!")
     root = tk.Tk()
     app = GuiApp(root)
     root.mainloop()

@@ -1,15 +1,17 @@
+#!/bin/bash
+
 # Function to display a simple progress bar
 progress() {
-  local duration=0.1  # Adjust the duration as needed
+  local duration=0.2  # Adjust the duration as needed
   local progress_char="#"
-  local width=10
+  local width=5
 
-  printf "Progress: ["
+  printf "["
   for ((i = 0; i < width; i++)); do
     printf "$progress_char"
     sleep $duration
   done
-  printf "....]"
+  printf "....]\n"
 }
 
 # Log function with timestamp

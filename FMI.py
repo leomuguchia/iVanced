@@ -1,17 +1,3 @@
-#Created for use for a larger iDevice management project
-#but this script is open for use and modifications
-#script by liomuguchia
-#licensed under the GNU Public licence
-#feel free to reach me out for consultations 
-#github @leomuguchia/@liomuguchia
-#instagram @ghost__xo
-#buymeacoffee @muguchialio
-#script should not be used to breach Apple Inc terms
-#I chose not to automate the email verification process 
-# to allow the user to receive updates on progress of FMI Off from Apple
-
-
-
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -32,7 +18,7 @@ import random
 import threading
 from datetime import datetime, timedelta
 import colorama
-
+import signal
 
 def clear_terminal_screen():
     # Clear the terminal screen
@@ -71,7 +57,7 @@ def get_user_choice():
     while True:
         choice = input("Select option >").strip()
 
-        if choice in ["1", "2", ""]:
+        if choice in ["1", "2", "3", ""]:
             return choice
         else:
             print("Invalid option. Press Enter for default option")
@@ -116,7 +102,7 @@ def check_session_expired(driver):
          driver.quit()
         except Exception as quit_error:
          print(f"Error while quitting the driver: {quit_error}")
-        sys.exit(0)
+         handle_exit()
         return True  # Session expired
     except:
         # Check if there is a "Continue" button
@@ -160,6 +146,9 @@ def set_bg_sleep():
     
     return bg_sleep
 
+def handle_exit():
+    clear_terminal_screen()
+    sys.exit(0)
 
 def generate_random_name():
     first_names = ["John", "Jane", "Bob", "Alice", "David", "Emma", "Michael", "Olivia", "Daniel", "Sophia"]
@@ -376,7 +365,7 @@ def fill_out_form(driver, details):
             driver.quit()
         except Exception as quit_error:
             print(f"Error while quitting the driver: {quit_error}")
-        sys.exit(1)
+            handle_exit()
         
 
 def lookup_case(driver, details):
@@ -449,7 +438,7 @@ def background_instance(bg_sleep, run_counter, source):
             if not os.path.exists(case_file_path):
                 print("No existing cases!")
                 print("Closing@0")
-                sys.exit(0)
+                handle_exit()
 
             try:
                 with open(case_file_path, 'r') as file:
@@ -459,7 +448,7 @@ def background_instance(bg_sleep, run_counter, source):
                 if not case_id_line or not last_name_line:
                     print("Case details not found in case.txt. Skipping background check.")
                     print("Closing@0")
-                    sys.exit(0)
+                    handle_exit()
 
                 # Extract case ID and last name
                 _, case_id = case_id_line.split(": ")
@@ -552,6 +541,8 @@ if __name__ == "__main__":
      # Check if the confirmation link is valid
      if not is_valid_confirmation_link(confirmation_link):
          print("Invalid confirmation link. Closing.")
+         time.sleep(2)
+         handle_exit()
      else:
          preference = set_preference()
          # Create a new Chrome browser instance for background check
@@ -637,7 +628,14 @@ if __name__ == "__main__":
         background_thread = threading.Thread(target=background_instance, args=(bg_sleep, run_counter, source))
         background_thread.start()
         background_thread.join()
-
+        
+    elif user_choice == "3":
+        print("Closing...")
+        time.sleep(2)
+        handle_exit()
+        
+    signal.signal(signal.SIGINT, handle_exit)
+    
 
 
 
