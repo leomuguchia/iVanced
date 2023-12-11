@@ -54,6 +54,8 @@ if [ "$1" = 'clean' ]; then
     rm -rf sshramdisk work
     echo "[*] Removed the current created SSH ramdisk"
     exit
+
+ #Ssh dump-blobs
 elif [ "$1" = 'dump-blobs' ]; then
     "$oscheck"/iproxy 2222 22 &>/dev/null &
     version=$("$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost "sw_vers -productVersion")
@@ -68,6 +70,8 @@ elif [ "$1" = 'dump-blobs' ]; then
     killall iproxy
     echo "[*] Onboard blobs should have dumped to the dumped.shsh file"
     exit
+
+ #Ssh reboot
 elif [ "$1" = 'reboot' ]; then
     "$oscheck"/iproxy 2222 22 &>/dev/null &
     "$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost "/sbin/reboot"
@@ -114,6 +118,7 @@ if [ ! -e sshramdisk ]; then
     mkdir sshramdisk
 fi
 
+#Ssh reset
 if [ "$1" = 'reset' ]; then
     if [ ! -e sshramdisk/iBSS.img4 ]; then
         echo "[-] Please create an SSH ramdisk first!"
@@ -143,6 +148,7 @@ if [ "$1" = 'reset' ]; then
     exit
 fi
 
+#Trollstore
 if [ "$2" = 'TrollStore' ]; then
     if [ -z "$3" ]; then
         echo "[-] Please pass an uninstallable system app to use (Tips is a great choice)"
@@ -150,6 +156,7 @@ if [ "$2" = 'TrollStore' ]; then
     fi
 fi
 
+#Ramdisk boot
 if [ "$1" = 'boot' ]; then
     if [ ! -e sshramdisk/iBSS.img4 ]; then
         echo "[-] Please create an SSH ramdisk first!"
