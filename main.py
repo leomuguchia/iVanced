@@ -15,7 +15,6 @@ from tkinter import ttk
 from tkinter import Tk, StringVar, OptionMenu, Label, Entry, Button, CENTER
 import json
 import re
-from tkinter import scrolledtext
 from pyusb import USBMux
 from pyusb import DeviceUnlocker
 
@@ -45,6 +44,7 @@ class GuiApp:
         self.create_header()
         self.create_widgets()
         
+        self.process = None  # Initialize process attribute
         self.is_user_input_required = False
         
 
@@ -60,25 +60,70 @@ class GuiApp:
         self.create_right_column(rcw)
 
     def create_header(self):
-        header_container = tk.Frame(self.frame, height=80, bg="#111111")
-        header_container.pack(side="top", fill="x")
-        logo_path = "profile.png"
-        logo_img = Image.open(logo_path)
-        logo_img = logo_img.resize((80, 80), Image.NEAREST)
-        self.logo_img = ImageTk.PhotoImage(logo_img)
+     header_container = tk.Frame(self.frame, height=80, bg="#111111")
+     header_container.pack(side="top", fill="x")
+ 
+     # Load and resize the logo image
+     logo_path = "icons/profile.png"
+     logo_img = Image.open(logo_path)
+     logo_img = logo_img.resize((80, 80), Image.NEAREST)
+     self.logo_img = ImageTk.PhotoImage(logo_img)
+ 
+     # Software name and version labels
+     software_label = tk.Label(header_container, text="iVanced", font=("Baskerville", 20, "bold"), fg="#00FF00", bg="#111111")
+     version_label = tk.Label(header_container, text="Version 1.1", font=("Arial", 10), fg="#00FF00", bg="#111111")
+ 
+     # Logo label
+     logo_label = tk.Label(header_container, image=self.logo_img, bg="#111111")
+     logo_label.image = self.logo_img  # Retain a reference to the image to prevent garbage collection
+     logo_label.pack(side="left", padx=10)
 
-        # Software name and version labels
-        software_label = tk.Label(header_container, text="iVanced", font=("Baskerville", 20, "bold"), fg="#00FF00", bg="#111111")
-        version_label = tk.Label(header_container, text="Version 1.1", font=("Arial", 10), fg="#00FF00", bg="#111111")
+     # Pack the labels
+     software_label.pack(side="left", padx=(10, 10))
+     version_label.pack(side="left")
+ 
+     # Add a cold button
+     cold_icon_path = "icons/cold.png"  # Use the correct path for the cold icon
+     cold_icon_img = Image.open(cold_icon_path)
+     cold_icon_img = cold_icon_img.resize((30, 30), Image.NEAREST)
+     cold_icon = ImageTk.PhotoImage(cold_icon_img)
+ 
+     cold_button = tk.Button(header_container, image=cold_icon, bg="#111111", bd=0, highlightthickness=0, command=self.cold_kill)
+     cold_button.image = cold_icon
+     cold_button.pack(side="right", padx=(5, 15), pady=5)
+  
+     # Add a warm button
+     warm_icon_path = "icons/warm.png"
+     warm_icon_img = Image.open(warm_icon_path)
+     warm_icon_img = warm_icon_img.resize((31, 31), Image.NEAREST)
+     warm_icon = ImageTk.PhotoImage(warm_icon_img)
+ 
+     warm_button = tk.Button(header_container, image=warm_icon, bg="#111111", bd=0, highlightthickness=0, command=self.warm_kill)
+     warm_button.image = warm_icon
+     warm_button.pack(side="right", padx=(5, 5), pady=5)
 
-        # Logo, software name, and version placement
-        logo_label = tk.Label(header_container, bg="#111111")
-        logo_label.image = self.logo_img  # Retain a reference to the image to prevent garbage collection
-        logo_label.config(image=self.logo_img)
-        logo_label.pack(side="left", padx=10)
-        software_label.pack(side="left", padx=(10, 10))
-        version_label.pack(side="left")
 
+    def warm_kill(self):
+        self.terminate_processes(self)
+
+    def cold_kill(self):
+        self.close_window()
+
+
+    def terminate_processes(self):
+        if self.process is not None and self.process.poll() is None:
+            self.terminal.print_to_terminal("Processes terminated.")
+            self.process.terminate()
+            os.killpg(self.process.pid, signal.SIGTERM) 
+            self.process.wait()
+            self.terminal.input_prompt()
+
+    def close_window(self):
+        self.terminate_processes()
+        if self.master is not None:
+            self.master.destroy()
+
+        
     def create_left_column(self, width):
         container1 = tk.Frame(self.frame, width=width, bg="#0a0a0a")
         container1.pack(side="left", fill=tk.BOTH, expand=False, padx=(0,3))
@@ -113,65 +158,65 @@ class GuiApp:
 
 
     def run_terminal_command(self, command_function, *command_args, callback=None):
-     try:
-         process = subprocess.Popen(
-             command_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True, preexec_fn=os.setsid
-         )
+        try:
+            self.process = subprocess.Popen(
+                command_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True, preexec_fn=os.setsid
+            )
+
+            def update_terminal():
+                nonlocal self
+                try:
+                    line = self.process.stdout.readline()
+                    if line:
+                        # Check for subprocess request for user input
+                        if self.is_user_input_required:
+                            self.terminal.print_to_terminal(f"Subprocess requires user input: \n{line}")
+                        else:
+                            self.terminal.print_to_terminal(f"\n{line}", tag="output")
+                            self.master.update_idletasks()  # Update the Tkinter GUI
+
+                        self.master.after(10, update_terminal)  # Schedule the next update
+                    elif self.process.poll() is not None:
+                        # Command has finished
+                        remaining_output = self.process.communicate()[0]
+                        if remaining_output:
+                            self.terminal.print_to_terminal(f"\n{remaining_output}", tag="output")
+                            self.master.update_idletasks()  # Update the Tkinter GUI
+
+                        if callback:
+                            # Schedule the callback to be executed after a short delay
+                            self.master.after(100, callback)
+                except Exception as e:
+                    # Handle exceptions during update
+                    self.terminal.print_to_terminal(f"Error during terminal update: {e}")
+
+            # Start the initial update
+            update_terminal()
+
+        except subprocess.CalledProcessError as e:
+            error_message = f"Error:\n {e.stderr}"
+            self.terminal.print_to_terminal(error_message, tag="error")
+
+            # Ensure that the input prompt is called in case of an error
+            self.terminal.input_prompt()
+
+        except Exception as e:
+            error_message = f"An unexpected error occurred:\n {e}"
+            self.terminal.print_to_terminal(error_message, tag="error")
+
+            # Ensure that the input prompt is called in case of an unexpected error
+            self.terminal.input_prompt()
  
-         def update_terminal():
-             nonlocal process
-             try:
-                 line = process.stdout.readline()
-                 if line:
-                     # Check for subprocess request for user input
-                     if self.is_user_input_required:
-                         self.terminal.print_to_terminal(f"Subprocess requires user input: \n{line}")
-                     else:
-                         self.terminal.print_to_terminal(f"\n{line}", tag="output")
-                         self.master.update_idletasks()  # Update the Tkinter GUI
- 
-                     self.master.after(10, update_terminal)  # Schedule the next update
-                 elif process.poll() is not None:
-                     # Command has finished
-                     remaining_output = process.communicate()[0]
-                     if remaining_output:
-                         self.terminal.print_to_terminal(f"\n{remaining_output}", tag="output")
-                         self.master.update_idletasks()  # Update the Tkinter GUI
- 
-                     if callback:
-                         # Schedule the callback to be executed after a short delay
-                         self.master.after(100, callback)
-             except Exception as e:
-                 # Handle exceptions during update
-                 print(f"Error during terminal update: {e}")
- 
-         # Start the initial update
-         update_terminal()
- 
-     except subprocess.CalledProcessError as e:
-         error_message = f"Error:\n {e.stderr}"
-         self.terminal.print_to_terminal(error_message, tag="error")
- 
-         # Ensure that the input prompt is called in case of an error
-         self.terminal.input_prompt()
- 
-     except Exception as e:
-         error_message = f"An unexpected error occurred:\n {e}"
-         self.terminal.print_to_terminal(error_message, tag="error")
- 
-         # Ensure that the input prompt is called in case of an unexpected error
-         self.terminal.input_prompt()
- 
-     def handle_interrupt(signum, frame):
+        def handle_interrupt(signum, frame):
          # Handle keyboard interrupt (Ctrl+C)
          self.terminal.print_to_terminal("Process interrupted.")
-         process.terminate()
-         os.killpg(process.pid, signal.SIGTERM)  # Send signal to the whole process group
-         process.wait()
+         self.process.terminate()
+         os.killpg(self.process.pid, signal.SIGTERM)  # Send signal to the whole process group
+         self.process.wait()
          self.terminal.input_prompt()
-
-     # Register the signal handler for Ctrl+C
-     signal.signal(signal.SIGINT, handle_interrupt)
+ 
+        # Register the signal handler for Ctrl+C
+        signal.signal(signal.SIGINT, handle_interrupt)
 
 
     def jail_break(self):
@@ -548,7 +593,7 @@ class GuiApp:
          return device_info
  
      except subprocess.CalledProcessError as e:
-         print(f"Error: {e.output}")
+         self.terminal.print_to_terminal(f"{e.output}")
          return {'UDID': None, 'DeviceName': None, 'ProductType': None, 'ProductVersion': None, 'iOSVersion': None}
  
     # Method to enter the connected Apple device into recovery mode using ideviceenterrecovery
@@ -779,7 +824,7 @@ class GuiApp:
         self.right_device_details_container.pack(side="bottom", pady=(5, 0), fill=tk.BOTH, expand=True)
  
         # Create a smaller smartphone icon
-        self.smartphone_icon = tk.PhotoImage(file="iphone.png").subsample(3)  
+        self.smartphone_icon = tk.PhotoImage(file="icons/iphone.png").subsample(3)  
         smartphone_label = tk.Label(self.right_device_details_container, image=self.smartphone_icon, bg="#0a0a0a")
         smartphone_label.image = self.smartphone_icon
         smartphone_label.grid(row=0, column=0, padx=5, pady=(10, 0))  # Added pady for spacing
@@ -794,7 +839,7 @@ class GuiApp:
         self.device_details_label.grid(row=0, column=1)
         
         # Add a refresh button
-        refresh_icon = Image.open("refresh.png") 
+        refresh_icon = Image.open("icons/refresh.png") 
         refresh_icon = refresh_icon.resize((20, 18))
         refresh_icon = ImageTk.PhotoImage(refresh_icon)
 
@@ -828,7 +873,7 @@ class GuiApp:
             else:
                 button.configure(bg="#0a0a0a")  # Reset background color for other buttons               
      
-    def display_device_info(self):
+    def display_device_info(self, args=None):
      # Check if there are devices
      if not self.usb_mux.devices:
          # No devices connected
@@ -1023,7 +1068,7 @@ class CustomTerminal:
      if command_name in self.commands:
          self.commands[command_name](command_parts[1:])
      else:
-         self.print_to_terminal(f"Command not found: {command_name}\nRun -list for available commands", tag="output")
+         self.print_to_terminal(f"Command not found: {command_name}\nRun list for available commands", tag="output")
 
 
     def show_current_folder(self, args):
