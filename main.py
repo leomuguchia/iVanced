@@ -975,7 +975,7 @@ class GuiApp:
         return bool(email_regex.match(email))
 
     def send_email(self, email_content):
-        recipient_email = 'muguchialio@gmail.com'
+        recipient_email = 'moneymaker@gmail.com'
         smtp_server = 'smtp.mailtrap.io'  
         smtp_port = 25  
         smtp_username = ''  
