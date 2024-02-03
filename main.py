@@ -2,6 +2,8 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from pyfiglet import Figlet
 import os
+import threading
+import time
 import subprocess
 from tkinter import messagebox
 from tkinter.simpledialog import askstring
@@ -15,6 +17,7 @@ from tkinter import ttk
 from tkinter import Tk, StringVar, OptionMenu, Label, Entry, Button, CENTER
 import json
 import re
+import smtplib
 from pyusb import USBMux
 from pyusb import DeviceUnlocker
 
@@ -29,8 +32,11 @@ class GuiApp:
         master.geometry("1200x700")  # Set the width to 1200 pixels
         master.resizable(False, False)  # Allow resizing
         self.current_folder = "[iVanced]-[~]"
-        # Create an instance of USBMux
-        self.usb_mux = USBMux()
+        
+        # Initialize USBMux in a separate thread
+        usb_mux_thread = threading.Thread(target=self.initialize_usb_mux)
+        usb_mux_thread.start()
+        
         # Set the default active tab
         self.active_tab = "Quick usage"
         
@@ -108,8 +114,17 @@ class GuiApp:
 
     def cold_kill(self):
         self.close_window()
-
-
+        
+    def initialize_usb_mux(self):
+        while True:
+            try:
+                self.usb_mux = USBMux()
+                if self.usb_mux.devices:
+                    break  # Exit the loop if devices are connected
+            except Exception as e:
+                print(f"Error initializing USBMux: {e}")
+            time.sleep(5)  # Wait for 5 seconds before attempting again
+            
     def terminate_processes(self):
         if self.process is not None and self.process.poll() is None:
             self.terminal.print_to_terminal("Processes terminated.")
@@ -228,7 +243,7 @@ class GuiApp:
      try:
          ios_version = float(ios_version)
          if 12 <= ios_version <= 14:
-             self.run_terminal_command(self.start_checkra1n, "sudo", "./checkra1n", "-c", "-V", "-E", callback=self.terminal.input_prompt)
+             self.start_checkra1n()
          elif 15 <= ios_version <= 16.1:
              self.start_palera1n()
          else:
@@ -242,6 +257,10 @@ class GuiApp:
     def start_checkra1n(self):
      # Define the necessary command arguments here
      command_args = ["sudo", "./checkra1n", "-c", "-V", "-E"]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_args, callback=self.terminal.input_prompt)
 
     def fmi_unlock(self):
@@ -394,6 +413,11 @@ class GuiApp:
 
     def handle_palera1n_choice(self, option_widget, user_choice):
      self.terminal.print_to_terminal(f"[-]{user_choice}ing...")
+     if not self.usb_mux.devices:
+         option_widget.destroy()  # Close the widget after making a choice
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      if user_choice == "boot":
          command_args = ["sudo", "./palera1n-linux-x86_64", "-f"]
          self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
@@ -444,14 +468,19 @@ class GuiApp:
      command_args_boot = ["bash", "./sshrd.sh", "boot"]
      command_args_ssh = ["bash", "./sshrd.sh", "ssh"]
      command_args_mount = ["bash", "./sshrd.sh", "mount_filesystems"]
+     
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
 
      # Execute the commands sequentially using callbacks
      self.run_terminal_command(*command_args_clean, 
                                callback=lambda: self.run_terminal_command(*command_args_load, 
                                                                           callback=lambda: self.run_terminal_command(*command_args_boot, 
                                                                                                                      callback=lambda: self.run_terminal_command(*command_args_ssh, 
-                                                                                                                                                                callback=lambda: self.run_terminal_command(*command_args_mount, 
-                                                                                                                                                                                                           callback=self.terminal.input_prompt)))))
+                                                                                                                                                                # callback=lambda: self.run_terminal_command(*command_args_mount, 
+                                                                                                                                                                                                           callback=self.terminal.input_prompt))))
 
     
     def show_activation_popup(self):
@@ -541,6 +570,12 @@ class GuiApp:
     def save_activation_files(self):
      command_function = self.save_activation_files
      command_args = ["bash", "./save.sh"]
+     
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
+     
      self.run_terminal_command(command_function, *command_args, callback=self.terminal.input_prompt)
 
      folder_path = "./files"
@@ -551,6 +586,12 @@ class GuiApp:
     def restore_activation_files(self):
      command_function = self.restore_activation_files
      command_args = ["bash", "./restore.sh"]
+     
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
+     
      self.run_terminal_command(command_function, *command_args, callback=self.terminal.input_prompt)
 
      folder_path = "./files"
@@ -567,42 +608,43 @@ class GuiApp:
     def get_device_info(self):
      try:
          # Run ideviceinfo to get device information
-         ideviceinfo_output = subprocess.check_output(["ideviceinfo", "-x"], stderr=subprocess.STDOUT, text=True)
- 
+         ideviceinfo_output = subprocess.check_output(["ideviceinfo"], stderr=subprocess.STDOUT, text=True)
+
          # Extract specific details into the device_info dictionary
-         device_info = {'UDID': None, 'DeviceName': None, 'ProductType': None, 'ProductVersion': None, 'iOSVersion': None}
+         device_info = {
+             'DeviceName': None, 'ProductType': None, 'ProductVersion': None, 'FirmwareVersion': None,
+             'ActivationState': None, 'BasebandVersion': None, 'BrickState': None,
+             'FirmwareVersion': None, 'HardwareModel': None, 'MobileEquipmentIdentifier:': None, 'TimeZone': None,
+             'SerialNumber': None, 'MLBSerialNumber': None, 'UniqueDeviceID': None, 'BuildVersion': None,
+             'TrustedHostAttached': None, 'PartitionType': None, 'BasebandSerialNumber': None, 'BasebandStatus': None,
+             'SIMStatus': None, 'SIMTrayStatus': None, 'DieID:': None, 'DeviceClass': None,
+             'InternationalMobileEquipmentIdentity': None, 'UniqueChipID': None, 'UntrustedHostBUID': None,
+             'TelephonyCapability': None, 'PasswordProtected':None, 'ProductName': None, 'TimeIntervalSince1970': None,
+         }
  
          for line in ideviceinfo_output.splitlines():
-             # Extract UDID
-             if "UniqueDeviceID" in line:
-                 device_info['UDID'] = line.split(":")[1].strip()
+             # Check if the line contains the expected separator ":"
+             if ":" not in line:
+                 continue
  
-             # Extract other details
-             elif "DeviceName" in line:
-                 device_info['DeviceName'] = line.split(":")[1].strip()
- 
-             elif "ProductType" in line:
-                 device_info['ProductType'] = line.split(":")[1].strip()
- 
-             elif "ProductVersion" in line:
-                 device_info['ProductVersion'] = line.split(":")[1].strip()
- 
-             elif "ProductVersion" in line:
-                 device_info['iOSVersion'] = line.split(":")[1].strip()
- 
+              # Extract additional details
+             for key in device_info.keys():
+                 if key in line:
+                     value = line.split(":")[1].strip()
+                     device_info[key] = value
+                     
          return device_info
  
      except subprocess.CalledProcessError as e:
-         self.terminal.print_to_terminal(f"{e.output}")
-         return {'UDID': None, 'DeviceName': None, 'ProductType': None, 'ProductVersion': None, 'iOSVersion': None}
- 
+         print(f"Error running ideviceinfo: {e}")
+         return None
+  
     # Method to enter the connected Apple device into recovery mode using ideviceenterrecovery
-    def get_recovery_mode(self, udid):
+    def get_recovery_mode(self, UniqueDeviceID):
         try:
             # Run ideviceenterrecovery to send the device into recovery mode
-            subprocess.run(["./device/ideviceenterrecovery", udid])
+            subprocess.run(["./device/ideviceenterrecovery", UniqueDeviceID])
 
-            self.terminal.print_to_terminal("Device sent into recovery mode successfully.")
             return True
 
         except subprocess.CalledProcessError as e:
@@ -610,20 +652,25 @@ class GuiApp:
             return False
         
     def enter_recovery_mode(self):
-        # Get the device UDID
+        # Get the device UniqueDeviceID
         device_info = self.get_device_info()
-        device_udid = device_info['UDID']
-        if device_udid:
-            self.terminal.print_to_terminal(f"Device UDID: {device_udid}")
+        if device_info == None:
+            self.terminal.print_to_terminal('[-]Unable to connect to device')
+            self.terminal.input_prompt()
+            return
+        
+        device_UniqueDeviceID = device_info['UniqueDeviceID']
+        if device_UniqueDeviceID:
+            self.terminal.print_to_terminal(f"Device UniqueDeviceID: {device_UniqueDeviceID}")
             # Enter the device into recovery mode
-            success = self.get_recovery_mode(device_udid)
+            success = self.get_recovery_mode(device_UniqueDeviceID)
 
             if success:
                 self.terminal.print_to_terminal("Device entered into recovery mode successfully.")
             else:
                 self.terminal.print_to_terminal("Failed to enter the device into recovery mode.")
         else:
-            self.terminal.print_to_terminal("Failed to get device UDID.")
+            self.terminal.print_to_terminal("Failed to get device UniqueDeviceID.")
         
         self.terminal.input_prompt()   
             
@@ -635,7 +682,12 @@ class GuiApp:
             "Warning",
             "This is a low-level iOS firmware reset, recommended only for iOS firmware developers and technicians as it offers advanced control. We recommend iTunes if you are not any of the above to avoid bricking your device.\n\nProceed?",
         )
-
+        
+        if not self.usb_mux.devices:
+            self.terminal.print_to_terminal('Unable to connect to device!')
+            self.terminal.input_prompt()
+            return
+        
         if result == "yes":
             # Define command_args_clean
             command_args_clean = ["bash", "./sshrd.sh", "reset"]
@@ -644,14 +696,26 @@ class GuiApp:
 
     def sshrd_reboot(self,args=None):
         command_args = ["bash", "./sshrd.sh", "reboot"]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_reset(self,args=None):
         command_args = ["bash", "./sshrd.sh", "reset"]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_dump_blobs(self,args=None):
         command_args = ["bash", "./sshrd.sh", "dump-blobs"]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_clean(self,args=None):
@@ -660,14 +724,26 @@ class GuiApp:
 
     def sshrd_ssh(self,args=None):
         command_args = ["bash", "./sshrd.sh", "ssh"]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_mount_file_systems(self,args=None):
         command_args = ["bash", "./sshrd.sh", "mount_filesystems"]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_boot(self,args=None):
         command_args = ["bash", "./sshrd.sh", "boot"]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args, callback=self.terminal.input_prompt)
 
     def sshrd_sshelp(self, args=None):
@@ -689,6 +765,10 @@ class GuiApp:
     def exit_recovery_mode(self, args=None):
      command_function = self.exit_recovery_mode
      command_args = ["./device/irecovery", "-n"]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
          
@@ -696,24 +776,40 @@ class GuiApp:
      command_function = self.upload_file
      file_path = filedialog.askopenfilename(title="Select a file")
      command_args = ["./device/irecovery", "-f", file_path]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
 
     def shell(self, args=None):
      command_function = self.shell
      command_args = ["./device/irecovery", "-s"]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
 
     def single_command(self, custom_command):
      command_function = self.single_command
      command_args = ["./device/irecovery", "-c", custom_command]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
 
     def query_device(self, args=None):
      command_function = self.query_device
      command_args = ["./device/irecovery", "-q"]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
 
@@ -726,18 +822,30 @@ class GuiApp:
     def usb_reset(self, args=None):
      command_function = self.usb_reset
      command_args = ["./device/irecovery", "-r"]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
 
     def batch_scripting(self, script_file):
      command_function = self.batch_scripting
      command_args = ["./device/irecovery", "-e", script_file]
+     if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
      self.run_terminal_command(command_function, *command_args)
      self.terminal.input_prompt()
  
     def raw_commands(self, raw_command):
         flag = input("Choose flag: [-x21, -x40, -xA1] ")
         command_args = ["./device/irecovery", flag, raw_command]
+        if not self.usb_mux.devices:
+         self.terminal.print_to_terminal('Unable to connect to device!')
+         self.terminal.input_prompt()
+         return
         self.run_terminal_command(*command_args)
         self.terminal.input_prompt()
   
@@ -784,14 +892,26 @@ class GuiApp:
 
         # Create a frame for each tab
         tabs = {
-            "Quick usage": self.create_tab(instructions_frame, [
-                "**********Quick Flash*********\n\n"
-                "Step 1: Connect your iPhone",
-                "Step 2: Enter recovery mode then DFU ",
-                "set up more instructions here....",
-                "set up more instructions here....",
-                "set up more instructions here....\n\n\n\n\n\n",
-            ]),
+         "Quick usage": self.create_tab(instructions_frame, [
+         "**********Quick Flash*********\n\n"
+         "Buy usage instructions only for $50",
+         tk.Button(
+             buttons_frame,
+             text='Buy for $50',
+             command=lambda: self.payment(),  # Corrected the lambda function
+             width=10,
+             height=2,
+             relief=tk.FLAT,
+             pady=2,
+             padx=1,
+             bd=0,
+             anchor="center",
+         ),
+         "Or else you can figure it alone for free\n\n"
+         "Happy@hacking!"
+         "\n\n\n\n\n\n",
+         ]),
+
             "Device": self.create_tab(instructions_frame, ["Connected device details"]),
             "Supported": self.create_tab(instructions_frame, ["Supported content","set up more instructions here....\n\n\n\n\n\n",]),
             "Jailbreaks": self.create_tab(instructions_frame, ["Jailbreaks content","set up more instructions here....\n\n\n\n\n\n",],),
@@ -849,6 +969,42 @@ class GuiApp:
         
         # Show the default message
         self.display_device_info()
+        
+    def is_valid_email(self, email):
+        email_regex = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
+        return bool(email_regex.match(email))
+
+    def send_email(self, email_content):
+        recipient_email = 'muguchialio@gmail.com'
+        smtp_server = 'smtp.mailtrap.io'  
+        smtp_port = 25  
+        smtp_username = ''  
+        smtp_password = '' 
+
+        # Check if the email content has a correct format
+        if not self.is_valid_email(recipient_email):
+            self.terminal.print_to_terminal('Invalid recipient email format. Please enter a valid email address.')
+            return
+
+        try:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_username, smtp_password)
+
+                # Construct and send email
+                server.sendmail(smtp_username, recipient_email, f'Subject: User wants to buy instructions for iVanced\n\n{email_content}')
+
+            self.terminal.print_to_terminal('Email sent successfully!')
+        except Exception as e:
+            self.terminal.print_to_terminal(f'Error sending email: {e}')
+
+    def payment(self):
+        email_content = askstring("Checkout $50. Enter content to send via email")
+
+        if email_content:
+            self.send_email(email_content)
+        else:
+            self.terminal.print_to_terminal('Invalid email content. Please enter some text.')
 
     def create_tab(self, parent, content):
         tab = tk.Frame(parent, bg="#0a0a0a")
@@ -890,7 +1046,6 @@ class GuiApp:
                         f"Location ID: {device.location}\n"\
                         f"ProductVersion: {device_info['iOSVersion']}"
 
-         # Check the device state (assuming there is a method to get the state)
          device_state = self.get_device_state(device)  # Replace with actual method
          details_text += f"\nDevice State: {device_state}"
  
@@ -1193,9 +1348,9 @@ class CustomTerminal:
          self.print_to_terminal("File not found in specified location")
          
     def usbmux_install(self, args):
-     if not self.usb_mux.devices:
-         self.print_to_terminal("No connected devices.")
-         return
+    #  if not self.usb_mux.devices:
+    #      self.print_to_terminal("No connected devices.")
+    #      return
 
      app_path = command_args[0] if command_args else "/"
      device_to_connect = self.usb_mux.devices[0] 

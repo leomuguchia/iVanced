@@ -51,12 +51,14 @@ fi
 chmod +x "$oscheck"/*
 
 if [ "$1" = 'clean' ]; then
+    echo "[*] Cleaning..."
     rm -rf sshramdisk work
-    echo "[*] Removed the current created SSH ramdisk"
+    echo "[*] success!"
     exit
 
  #Ssh dump-blobs
 elif [ "$1" = 'dump-blobs' ]; then
+    echo "[*] Dumping -shsh- blobs..."
     "$oscheck"/iproxy 2222 22 &>/dev/null &
     version=$("$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost "sw_vers -productVersion")
     version=${version%%.*}
@@ -73,11 +75,13 @@ elif [ "$1" = 'dump-blobs' ]; then
 
  #Ssh reboot
 elif [ "$1" = 'reboot' ]; then
+    echo "[*] Attempting reboot device..."
     "$oscheck"/iproxy 2222 22 &>/dev/null &
     "$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost "/sbin/reboot"
     echo "[*] Device should now reboot"
     exit
 elif [ "$1" = 'ssh' ]; then
+    echo "[*] ssh..."
     "$oscheck"/iproxy 2222 22 &>/dev/null &
     "$oscheck"/sshpass -p 'alpine' ssh -o StrictHostKeyChecking=no -p2222 root@localhost
     killall iproxy
@@ -158,11 +162,12 @@ fi
 
 #Ramdisk boot
 if [ "$1" = 'boot' ]; then
+    
     if [ ! -e sshramdisk/iBSS.img4 ]; then
         echo "[-] Please create an SSH ramdisk first!"
         exit
     fi
-
+    echo "[*] booting device..."
     major=$(cat sshramdisk/version.txt | awk -F. '{print $1}')
     minor=$(cat sshramdisk/version.txt | awk -F. '{print $2}')
     patch=$(cat sshramdisk/version.txt | awk -F. '{print $3}')
